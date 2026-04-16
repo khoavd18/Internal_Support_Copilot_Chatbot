@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "internal-support-copilot"
+version = "1.2.0"
+description = "Enterprise-oriented internal support copilot built with local RAG and multi-agent orchestration."
+requires-python = ">=3.10"
+dependencies = [
+  "accelerate>=0.33,<1",
+  "beautifulsoup4>=4.12,<5",
+  "fastapi>=0.115,<1",
+  "fastembed>=0.8,<1",
+  "langchain-community>=0.3,<0.4",
+  "langchain-core>=0.3,<0.4",
+  "langchain-huggingface>=0.1,<0.2",
+  "langchain-qdrant>=0.2,<0.3",
+  "langchain-text-splitters>=0.3,<0.4",
+  "langgraph>=0.2,<0.3",
+  "pydantic>=2.8,<3",
+  "PyJWT[crypto]>=2.8,<3",
+  "python-dotenv>=1.0,<2",
+  "qdrant-client>=1.10,<2",
+  "redis>=5,<8",
+  "requests>=2.32,<3",
+  "sentence-transformers>=3.0,<4",
+  "streamlit>=1.37,<2",
+  "torch>=2.3,<3",
+  "transformers>=4.44,<5",
+  "typing-extensions>=4.12,<5",
+  "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "fakeredis>=2.23,<3",
+  "httpx>=0.27,<1",
+  "pytest>=8.2,<9",
+  "ruff>=0.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true

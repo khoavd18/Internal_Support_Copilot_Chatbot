@@ -1,0 +1,16 @@
+.git
+.github
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+.env
+data_source/processed/
+data_source/raw/
+eval/runs/
+eval/reports/
+Internal_Support_Copilot.zip

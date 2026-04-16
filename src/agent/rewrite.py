@@ -57,7 +57,7 @@ def is_follow_up_question(question: str, history: List[Dict[str, str]]) -> bool:
     if not q:
         return False
 
-    if len(q) <= 18:
+    if COMPARISON_PATTERN.match(q):
         return True
 
     if q.startswith(FOLLOW_UP_PREFIXES):

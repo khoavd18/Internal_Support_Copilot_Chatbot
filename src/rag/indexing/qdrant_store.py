@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from functools import lru_cache
+import logging
+
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
@@ -20,6 +23,8 @@ from src.rag.chunking.chunking import split_documents
 
 import uuid
 
+logger = logging.getLogger(__name__)
+
 def _to_qdrant_point_id(raw_id: str) -> str:
     """
     Chuyển internal id của project sang UUID ổn định để Qdrant chấp nhận.
@@ -34,14 +39,25 @@ def _get_client() -> QdrantClient:
     )
 
 
+@lru_cache(maxsize=1)
+def _get_sparse_embeddings() -> FastEmbedSparse:
+    return FastEmbedSparse(model_name="Qdrant/bm25")
+
+
 def _prepare_indexable_documents():
     if LEAF_PATH.exists():
-        print("[INFO] Loading hierarchical leaf nodes...")
+        logger.info(
+            "Loading hierarchical leaf nodes for indexing",
+            extra={"event": "indexing.documents.load", "indexing_mode": "hierarchical_leaf"},
+        )
         docs = load_leaf_documents()
         chunks = docs
         indexing_mode = "hierarchical_leaf"
     else:
-        print("[INFO] Loading regular documents...")
+        logger.info(
+            "Loading regular documents for indexing",
+            extra={"event": "indexing.documents.load", "indexing_mode": "regular_split"},
+        )
         docs = load_documents()
         chunks = split_documents(docs)
         indexing_mode = "regular_split"
@@ -51,18 +67,27 @@ def _prepare_indexable_documents():
 
 def _ensure_collection(client: QdrantClient, embeddings, rebuild: bool):
     dense_size = len(embeddings.embed_query("test embedding size"))
-    print(f"[INFO] Dense vector size = {dense_size}")
+    logger.info(
+        "Resolved dense vector size",
+        extra={"event": "indexing.collection.dimension", "dense_size": dense_size},
+    )
 
     if rebuild:
         try:
             client.delete_collection(QDRANT_COLLECTION_NAME)
-            print(f"[INFO] Deleted old collection: {QDRANT_COLLECTION_NAME}")
+            logger.info(
+                "Deleted existing Qdrant collection",
+                extra={"event": "indexing.collection.deleted", "collection": QDRANT_COLLECTION_NAME},
+            )
         except Exception:
             pass
 
     try:
         client.get_collection(QDRANT_COLLECTION_NAME)
-        print(f"[INFO] Collection already exists: {QDRANT_COLLECTION_NAME}")
+        logger.info(
+            "Qdrant collection already exists",
+            extra={"event": "indexing.collection.exists", "collection": QDRANT_COLLECTION_NAME},
+        )
         return
     except Exception:
         pass
@@ -83,13 +108,16 @@ def _ensure_collection(client: QdrantClient, embeddings, rebuild: bool):
         },
         sparse_vectors_config=sparse_vectors_config,
     )
-    print(f"[DONE] Created collection: {QDRANT_COLLECTION_NAME}")
+    logger.info(
+        "Created Qdrant collection",
+        extra={"event": "indexing.collection.created", "collection": QDRANT_COLLECTION_NAME},
+    )
 
 
 def build_qdrant_store(rebuild: bool = False):
     docs, chunks, indexing_mode = _prepare_indexable_documents()
     embeddings = get_embedding_model()
-    sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+    sparse_embeddings = _get_sparse_embeddings()
     client = _get_client()
 
     _ensure_collection(client, embeddings, rebuild=rebuild)
@@ -122,9 +150,16 @@ def build_qdrant_store(rebuild: bool = False):
 
     retrieval_mode = RetrievalMode.HYBRID if USE_QDRANT_HYBRID else RetrievalMode.DENSE
 
-    print(f"[INFO] Indexing mode   : {indexing_mode}")
-    print(f"[INFO] Final chunks    : {len(filtered_chunks)}")
-    print(f"[INFO] Retrieval mode  : {retrieval_mode}")
+    logger.info(
+        "Building Qdrant store",
+        extra={
+            "event": "indexing.build.started",
+            "indexing_mode": indexing_mode,
+            "final_chunks": len(filtered_chunks),
+            "retrieval_mode": str(retrieval_mode),
+            "rebuild": rebuild,
+        },
+    )
 
     vector_store = QdrantVectorStore(
         client=client,
@@ -138,13 +173,16 @@ def build_qdrant_store(rebuild: bool = False):
 
     vector_store.add_documents(documents=filtered_chunks, ids=ids)
 
-    print(f"[DONE] Qdrant store ready: {QDRANT_COLLECTION_NAME}")
+    logger.info(
+        "Qdrant store ready",
+        extra={"event": "indexing.build.completed", "collection": QDRANT_COLLECTION_NAME},
+    )
     return vector_store
 
 
 def load_qdrant_store():
     embeddings = get_embedding_model()
-    sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+    sparse_embeddings = _get_sparse_embeddings()
     client = _get_client()
 
     retrieval_mode = RetrievalMode.HYBRID if USE_QDRANT_HYBRID else RetrievalMode.DENSE
@@ -159,8 +197,14 @@ def load_qdrant_store():
         sparse_vector_name=QDRANT_SPARSE_VECTOR_NAME,
     )
 
-    print(f"[DONE] Loaded Qdrant store: {QDRANT_COLLECTION_NAME}")
-    print(f"[INFO] Retrieval mode      : {retrieval_mode}")
+    logger.info(
+        "Loaded Qdrant store",
+        extra={
+            "event": "indexing.store.loaded",
+            "collection": QDRANT_COLLECTION_NAME,
+            "retrieval_mode": str(retrieval_mode),
+        },
+    )
     return vector_store
 
 

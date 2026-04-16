@@ -1,7 +1,6 @@
 services:
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: internal_support_qdrant
     ports:
       - "127.0.0.1:6333:6333"
       - "127.0.0.1:6334:6334"
@@ -9,5 +8,84 @@ services:
       - qdrant_storage:/qdrant/storage
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    env_file:
+      - ./.env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      HF_HOME: /app/.cache/huggingface
+      LOCAL_GIT_DEFAULT_REPO_PATH: /app
+      LOCAL_GIT_ALLOWED_ROOTS: /app
+    depends_on:
+      - qdrant
+      - redis
+    volumes:
+      - ./data_source:/app/data_source
+      - hf_cache:/app/.cache/huggingface
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5).status == 200 else sys.exit(1)",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui
+    environment:
+      INTERNAL_SUPPORT_API_BASE_URL: http://api:8000
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8501:8501"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5).status == 200 else sys.exit(1)",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
 volumes:
   qdrant_storage:
+  redis_data:
+  hf_cache:

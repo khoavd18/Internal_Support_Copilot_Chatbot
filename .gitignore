@@ -1,0 +1,83 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyc.*
+*.pyo
+*.pyd
+*.pyclear
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.pyre/
+.tox/
+.nox/
+.ipynb_checkpoints/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Virtual environments and local environment files
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+.python-version
+env/
+.venv/
+venv/
+ENV/
+__pypackages__/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+site/
+
+# IDE / editor
+.vscode/
+.idea/
+.vs/
+*.code-workspace
+*.swp
+*.swo
+*~
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Runtime logs and temp artifacts
+*.log
+*.pid
+*.out
+*.err
+tmp/
+temp/
+*.tmp
+pytest-cache-files-*/
+
+# Generated evaluation artifacts
+eval/runs/
+eval/reports/*.txt
+
+# Local data and cache
+data_source/raw/
+data_source/processed/
+hf_cache/
+.cache/
+artifacts/
+outputs/
+qdrant_storage/
+.qdrant/
+Internal_Support_Copilot.zip
+
+# Streamlit
+.streamlit/secrets.toml

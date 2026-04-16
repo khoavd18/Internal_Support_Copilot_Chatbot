@@ -1,7 +1,0 @@
-Run file          : D:\code\rag\Internal_Support_Copilot\eval\runs\20260327_135031_retrieval_eval.jsonl
-Total queries     : 10
-Total results     : 40
-Average results   : 4.00
-Parent count      : 12
-Parent pack count : 11
-Leaf count        : 17

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,8 @@ from src.rag.ingest.builders import (
     build_metadata,
     build_ticket_text,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -71,8 +74,12 @@ def load_documents(
                     )
                 )
         else:
-            print(
-                f"[WARN] tickets file not found: {tickets_path}. Continue without tickets."
+            logger.warning(
+                "Tickets file not found; continuing without tickets",
+                extra={
+                    "event": "ingest.loader.tickets_missing",
+                    "tickets_path": str(tickets_path),
+                },
             )
 
     return all_docs

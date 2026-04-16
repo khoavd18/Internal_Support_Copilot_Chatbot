@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 
 try:
@@ -14,44 +15,54 @@ from src.core.settings import (
 )
 from src.rag.embedding.embeddings import get_device
 
+logger = logging.getLogger(__name__)
+
 
 @lru_cache(maxsize=1)
 def get_cross_encoder():
-    """
-    Lazy load cross-encoder.
-    Nếu thư viện chưa có hoặc user tắt thì trả None.
-    """
+    """Lazy load the optional cross-encoder."""
     if not USE_CROSS_ENCODER:
-        print("[INFO] Cross-encoder disabled by settings.")
+        logger.info(
+            "Cross-encoder disabled by settings",
+            extra={"event": "cross_encoder.disabled"},
+        )
         return None
 
     if CrossEncoder is None:
-        print("[WARN] sentence_transformers.CrossEncoder chưa import được.")
-        print("[WARN] Nếu cần, cài: pip install sentence-transformers")
+        logger.warning(
+            "CrossEncoder import is unavailable",
+            extra={"event": "cross_encoder.unavailable"},
+        )
         return None
 
     device = get_device()
-
-    print("=" * 80)
-    print(f"[INFO] Loading cross-encoder: {CROSS_ENCODER_MODEL_NAME}")
-    print(f"[INFO] Cross-encoder device: {device}")
-    print(f"[INFO] Cross-encoder batch size: {CROSS_ENCODER_BATCH_SIZE}")
-    print("=" * 80)
+    logger.info(
+        "Loading cross-encoder",
+        extra={
+            "event": "cross_encoder.load.started",
+            "model_name": CROSS_ENCODER_MODEL_NAME,
+            "device": device,
+            "batch_size": CROSS_ENCODER_BATCH_SIZE,
+        },
+    )
 
     model = CrossEncoder(
         CROSS_ENCODER_MODEL_NAME,
         device=device,
     )
 
-    print("[DONE] Cross-encoder loaded successfully.")
+    logger.info(
+        "Cross-encoder loaded successfully",
+        extra={
+            "event": "cross_encoder.load.completed",
+            "model_name": CROSS_ENCODER_MODEL_NAME,
+        },
+    )
     return model
 
 
 def rerank_with_cross_encoder(query: str, docs: list, top_k: int) -> list:
-    """
-    Rerank docs bằng cross-encoder trên top candidates.
-    Trả lại docs đã được sắp xếp lại theo ce_score giảm dần.
-    """
+    """Rerank documents with the cross-encoder over the final candidate set."""
     if not docs:
         return []
 

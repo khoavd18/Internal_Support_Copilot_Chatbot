@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from typing import Any, Optional
@@ -25,6 +26,7 @@ _MODEL = None
 _TOKENIZER = None
 _LLM_WRAPPER = None
 _LOCK = threading.RLock()
+logger = logging.getLogger(__name__)
 
 
 def _has_cuda() -> bool:
@@ -46,9 +48,12 @@ def _build_quantization_config() -> Optional[BitsAndBytesConfig]:
         return None
 
     if not _has_cuda():
-        print(
-            f"[WARN] LLM_QUANTIZATION={QUANTIZATION} nhưng torch không có CUDA. "
-            f"Tự fallback về non-quantized load."
+        logger.warning(
+            "Requested LLM quantization without CUDA; falling back to non-quantized load",
+            extra={
+                "event": "llm.quantization.fallback",
+                "quantization": QUANTIZATION,
+            },
         )
         return None
 
@@ -79,15 +84,19 @@ def _load_model_and_tokenizer():
         if _MODEL is not None and _TOKENIZER is not None:
             return _MODEL, _TOKENIZER
 
-        print("=" * 80)
-        print(f"[INFO] Loading local LLM: {MODEL_NAME}")
-        print(f"[INFO] Quantization mode: {QUANTIZATION}")
-        print(f"[INFO] CUDA available: {_has_cuda()}")
-        print(f"[INFO] Preferred dtype: {_preferred_torch_dtype()}")
-        print(f"[INFO] Max input tokens: {MAX_INPUT_TOKENS}")
-        print(f"[INFO] Max new tokens  : {MAX_NEW_TOKENS}")
-        print(f"[INFO] Do sample       : {DO_SAMPLE}")
-        print("=" * 80)
+        logger.info(
+            "Loading local LLM",
+            extra={
+                "event": "llm.load.started",
+                "model_name": MODEL_NAME,
+                "quantization": QUANTIZATION,
+                "cuda_available": _has_cuda(),
+                "preferred_dtype": str(_preferred_torch_dtype()),
+                "max_input_tokens": MAX_INPUT_TOKENS,
+                "max_new_tokens": MAX_NEW_TOKENS,
+                "do_sample": DO_SAMPLE,
+            },
+        )
 
         quant_config = _build_quantization_config()
 
@@ -141,14 +150,23 @@ def _load_model_and_tokenizer():
 
         try:
             mem = model.get_memory_footprint()
-            print(f"[INFO] Model memory footprint: {mem / (1024 ** 3):.2f} GB")
+            logger.info(
+                "Local LLM memory footprint resolved",
+                extra={
+                    "event": "llm.load.memory",
+                    "memory_gb": round(mem / (1024 ** 3), 2),
+                },
+            )
         except Exception:
             pass
 
         _MODEL = model
         _TOKENIZER = tokenizer
 
-        print("[DONE] Local LLM loaded successfully.")
+        logger.info(
+            "Local LLM loaded successfully",
+            extra={"event": "llm.load.completed", "model_name": MODEL_NAME},
+        )
         return _MODEL, _TOKENIZER
 
 

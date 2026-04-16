@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ruff>=0.11,<1"
+
+      - name: Detect changed Python files
+        id: changed-python
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            **/*.py
+
+      - name: Run ruff lint on changed Python files
+        if: steps.changed-python.outputs.any_changed == 'true'
+        shell: bash
+        run: |
+          read -r -a files <<< "${{ steps.changed-python.outputs.all_changed_files }}"
+          python -m ruff check --select E,F,UP,B --ignore E501,B008 "${files[@]}"
+
+      - name: No Python files changed
+        if: steps.changed-python.outputs.any_changed != 'true'
+        run: echo "No Python files changed; skipping lint."
+
+  import-format:
+    name: Import And Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ruff>=0.11,<1"
+
+      - name: Detect changed Python files
+        id: changed-python
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            **/*.py
+
+      - name: Run import and format checks on changed Python files
+        if: steps.changed-python.outputs.any_changed == 'true'
+        shell: bash
+        run: |
+          read -r -a files <<< "${{ steps.changed-python.outputs.all_changed_files }}"
+          python -m ruff check --select I "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+
+      - name: No Python files changed
+        if: steps.changed-python.outputs.any_changed != 'true'
+        run: echo "No Python files changed; skipping import/format checks."
+
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: python -m pytest -m "not integration" -q

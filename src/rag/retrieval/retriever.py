@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import logging
+
+from qdrant_client import models
+
+from src.core.observability import observe_duration
 from src.core.settings import CROSS_ENCODER_TOP_K, USE_CROSS_ENCODER
 from src.rag.indexing.store_manager import get_vector_store
 from src.rag.ingest.hierarchical_loader import PARENT_PATH, load_parent_map
@@ -7,6 +12,35 @@ from src.rag.retrieval.cross_encoder import rerank_with_cross_encoder
 from src.rag.retrieval.parent_merge import merge_leaf_results_with_parents
 from src.rag.retrieval.query_analyzer import extract_keyword_groups
 from src.rag.retrieval.reranker import rerank_documents
+
+logger = logging.getLogger(__name__)
+
+
+def _run_rerank_stage(
+    *,
+    stage: str,
+    strategy: str,
+    docs: list,
+    top_k: int,
+    operation,
+) -> list:
+    with observe_duration(
+        "rag.rerank",
+        metric_name="rag.rerank.duration_ms",
+        metric_attributes={
+            "stage": stage,
+            "strategy": strategy,
+        },
+        span_attributes={
+            "stage": stage,
+            "strategy": strategy,
+            "docs_in": len(docs),
+            "top_k": top_k,
+        },
+    ) as observation:
+        reranked = operation()
+        observation.set_attribute("docs_out", len(reranked))
+        return reranked
 
 
 def _load_parent_map_if_available() -> dict[str, dict]:
@@ -48,10 +82,6 @@ def _node_priority(doc) -> int:
 
 
 def _final_dedupe_by_origin(docs: list, top_k: int) -> list:
-    """
-    Nếu đã có parent_pack cho một origin_doc_id thì bỏ parent/leaf cùng origin đó.
-    Nếu chưa có pack thì giữ doc có priority cao nhất và xuất hiện sớm nhất.
-    """
     kept = []
     seen = {}
 
@@ -92,10 +122,6 @@ def _final_dedupe_by_origin(docs: list, top_k: int) -> list:
 
 
 def _prefilter_candidates_for_auth_query(query: str, docs: list, top_k: int) -> list:
-    """
-    Nếu query nghiêng mạnh về GitHub authentication/passkey,
-    ưu tiên candidate từ github_docs có auth signal rõ ràng.
-    """
     keyword_groups = extract_keyword_groups(query)
     intent_labels = set(keyword_groups.get("intent_labels", []))
 
@@ -124,102 +150,236 @@ def _prefilter_candidates_for_auth_query(query: str, docs: list, top_k: int) -> 
         if source == "github_docs" and auth_hit:
             filtered.append(doc)
 
-    # chỉ dùng filter khi còn đủ candidate để tránh lọc quá tay
     if len(filtered) >= max(top_k, 4):
         return filtered
 
     return docs
 
 
-def retrieve_documents(query: str, top_k: int = 4, rebuild: bool = False):
+def retrieve_documents(
+    query: str,
+    top_k: int = 4,
+    rebuild: bool = False,
+    qdrant_filter: models.Filter | None = None,
+):
     """
-    Retrieval v3 - Qdrant native hybrid:
+    Retrieval flow:
     1) Qdrant hybrid similarity search
-    2) prefilter nhẹ theo intent nếu cần
+    2) light intent prefilter when useful
     3) heuristic rerank
-    4) merge cùng parent / sibling sections cùng doc
-    5) heuristic rerank lần 2
-    6) cross-encoder rerank final candidates
-    7) final dedupe theo origin_doc_id
+    4) optional parent/sibling merge
+    5) heuristic rerank after merge
+    6) optional cross-encoder rerank
+    7) final dedupe by origin document
     """
-    vector_store = get_vector_store(rebuild=rebuild)
+    with observe_duration(
+        "rag.retrieve",
+        metric_name="rag.retrieval.duration_ms",
+        metric_attributes={
+            "top_k": top_k,
+            "rebuild": rebuild,
+            "has_filter": qdrant_filter is not None,
+        },
+        span_attributes={
+            "top_k": top_k,
+            "rebuild": rebuild,
+            "has_filter": qdrant_filter is not None,
+            "query_length": len(query or ""),
+        },
+    ) as observation:
+        vector_store = get_vector_store(rebuild=rebuild)
 
-    candidate_k = max(top_k * 6, 18)
-    rerank_k = max(top_k * 3, 8)
-    ce_k = max(CROSS_ENCODER_TOP_K, top_k)
+        candidate_k = max(top_k * 6, 18)
+        rerank_k = max(top_k * 3, 8)
+        ce_k = max(CROSS_ENCODER_TOP_K, top_k)
+        observation.set_attribute("candidate_k", candidate_k)
+        observation.set_attribute("rerank_k", rerank_k)
+        observation.set_attribute("cross_encoder_top_k", ce_k)
 
-    # QdrantVectorStore đã chạy hybrid ở backend
-    candidate_docs = vector_store.similarity_search(
-        query,
-        k=candidate_k,
-    )
+        logger.info(
+            "Retriever started",
+            extra={
+                "event": "retrieval.started",
+                "query_length": len(query or ""),
+                "top_k": top_k,
+                "candidate_k": candidate_k,
+                "rerank_k": rerank_k,
+                "ce_k": ce_k,
+                "rebuild": rebuild,
+                "qdrant_filter_applied": qdrant_filter is not None,
+                "cross_encoder_enabled": USE_CROSS_ENCODER,
+            },
+        )
 
-    if not candidate_docs:
-        return []
+        candidate_docs = vector_store.similarity_search(
+            query,
+            k=candidate_k,
+            filter=qdrant_filter,
+        )
 
-    # Prefilter nhẹ cho auth/passkey intent
-    candidate_docs = _prefilter_candidates_for_auth_query(
-        query=query,
-        docs=candidate_docs,
-        top_k=top_k,
-    )
-
-    # Stage 1: heuristic rerank leaf candidates
-    stage1_docs = rerank_documents(
-        query=query,
-        docs=candidate_docs,
-        top_k=rerank_k,
-    )
-
-    # Fallback mềm nếu heuristic quá gắt
-    if not stage1_docs:
-        stage1_docs = candidate_docs[:rerank_k]
-
-    parent_map = _load_parent_map_if_available()
-
-    # Nếu không có hierarchical data hoặc docs không phải leaf -> fallback
-    if not parent_map or not any(_looks_like_leaf(doc) for doc in stage1_docs):
-        if USE_CROSS_ENCODER:
-            final_docs = rerank_with_cross_encoder(
-                query=query,
-                docs=stage1_docs,
-                top_k=max(top_k * 2, top_k),
+        if not candidate_docs:
+            observation.set_attribute("candidate_docs", 0)
+            observation.set_attribute("final_docs", 0)
+            logger.info(
+                "Retriever completed with no candidates",
+                extra={"event": "retrieval.completed", "candidate_docs": 0, "final_docs": 0},
             )
-            return _final_dedupe_by_origin(final_docs, top_k=top_k)
+            return []
 
-        final_docs = rerank_documents(
+        candidate_docs = _prefilter_candidates_for_auth_query(
             query=query,
-            docs=stage1_docs,
+            docs=candidate_docs,
             top_k=top_k,
         )
-        return _final_dedupe_by_origin(final_docs, top_k=top_k)
+        observation.set_attribute("candidate_docs", len(candidate_docs))
 
-    # Stage 2: merge context
-    merged_docs = merge_leaf_results_with_parents(
-        retrieved_docs=stage1_docs,
-        parent_map=parent_map,
-        min_children_to_merge=2,
-        min_sibling_parents_to_merge=2,
-        max_results=rerank_k,
-    )
-
-    # Stage 3: heuristic rerank lại sau merge
-    stage3_docs = rerank_documents(
-        query=query,
-        docs=merged_docs,
-        top_k=ce_k,
-    )
-
-    if not stage3_docs:
-        stage3_docs = merged_docs[:ce_k]
-
-    # Stage 4: cross-encoder final rerank
-    if USE_CROSS_ENCODER:
-        final_docs = rerank_with_cross_encoder(
-            query=query,
-            docs=stage3_docs,
-            top_k=max(top_k * 2, top_k),
+        stage1_docs = _run_rerank_stage(
+            stage="stage1",
+            strategy="heuristic",
+            docs=candidate_docs,
+            top_k=rerank_k,
+            operation=lambda: rerank_documents(
+                query=query,
+                docs=candidate_docs,
+                top_k=rerank_k,
+            ),
         )
-        return _final_dedupe_by_origin(final_docs, top_k=top_k)
 
-    return _final_dedupe_by_origin(stage3_docs, top_k=top_k)
+        if not stage1_docs:
+            stage1_docs = candidate_docs[:rerank_k]
+        observation.set_attribute("stage1_docs", len(stage1_docs))
+
+        parent_map = _load_parent_map_if_available()
+
+        if not parent_map or not any(_looks_like_leaf(doc) for doc in stage1_docs):
+            observation.set_attribute("used_parent_merge", False)
+            if USE_CROSS_ENCODER:
+                final_docs = _run_rerank_stage(
+                    stage="final",
+                    strategy="cross_encoder",
+                    docs=stage1_docs,
+                    top_k=max(top_k * 2, top_k),
+                    operation=lambda: rerank_with_cross_encoder(
+                        query=query,
+                        docs=stage1_docs,
+                        top_k=max(top_k * 2, top_k),
+                    ),
+                )
+                deduped = _final_dedupe_by_origin(final_docs, top_k=top_k)
+                observation.set_attribute("used_cross_encoder", True)
+                observation.set_attribute("final_docs", len(deduped))
+                logger.info(
+                    "Retriever completed without hierarchical merge",
+                    extra={
+                        "event": "retrieval.completed",
+                        "candidate_docs": len(candidate_docs),
+                        "stage1_docs": len(stage1_docs),
+                        "merged_docs": len(stage1_docs),
+                        "final_docs": len(deduped),
+                        "used_cross_encoder": True,
+                        "used_parent_merge": False,
+                    },
+                )
+                return deduped
+
+            final_docs = _run_rerank_stage(
+                stage="final",
+                strategy="heuristic",
+                docs=stage1_docs,
+                top_k=top_k,
+                operation=lambda: rerank_documents(
+                    query=query,
+                    docs=stage1_docs,
+                    top_k=top_k,
+                ),
+            )
+            deduped = _final_dedupe_by_origin(final_docs, top_k=top_k)
+            observation.set_attribute("used_cross_encoder", False)
+            observation.set_attribute("final_docs", len(deduped))
+            logger.info(
+                "Retriever completed without hierarchical merge",
+                extra={
+                    "event": "retrieval.completed",
+                    "candidate_docs": len(candidate_docs),
+                    "stage1_docs": len(stage1_docs),
+                    "merged_docs": len(stage1_docs),
+                    "final_docs": len(deduped),
+                    "used_cross_encoder": False,
+                    "used_parent_merge": False,
+                },
+            )
+            return deduped
+
+        merged_docs = merge_leaf_results_with_parents(
+            retrieved_docs=stage1_docs,
+            parent_map=parent_map,
+            min_children_to_merge=2,
+            min_sibling_parents_to_merge=2,
+            max_results=rerank_k,
+        )
+        observation.set_attribute("used_parent_merge", True)
+        observation.set_attribute("merged_docs", len(merged_docs))
+
+        stage3_docs = _run_rerank_stage(
+            stage="stage3",
+            strategy="heuristic",
+            docs=merged_docs,
+            top_k=ce_k,
+            operation=lambda: rerank_documents(
+                query=query,
+                docs=merged_docs,
+                top_k=ce_k,
+            ),
+        )
+
+        if not stage3_docs:
+            stage3_docs = merged_docs[:ce_k]
+        observation.set_attribute("stage3_docs", len(stage3_docs))
+
+        if USE_CROSS_ENCODER:
+            final_docs = _run_rerank_stage(
+                stage="final",
+                strategy="cross_encoder",
+                docs=stage3_docs,
+                top_k=max(top_k * 2, top_k),
+                operation=lambda: rerank_with_cross_encoder(
+                    query=query,
+                    docs=stage3_docs,
+                    top_k=max(top_k * 2, top_k),
+                ),
+            )
+            deduped = _final_dedupe_by_origin(final_docs, top_k=top_k)
+            observation.set_attribute("used_cross_encoder", True)
+            observation.set_attribute("final_docs", len(deduped))
+            logger.info(
+                "Retriever completed",
+                extra={
+                    "event": "retrieval.completed",
+                    "candidate_docs": len(candidate_docs),
+                    "stage1_docs": len(stage1_docs),
+                    "merged_docs": len(merged_docs),
+                    "stage3_docs": len(stage3_docs),
+                    "final_docs": len(deduped),
+                    "used_cross_encoder": True,
+                    "used_parent_merge": True,
+                },
+            )
+            return deduped
+
+        deduped = _final_dedupe_by_origin(stage3_docs, top_k=top_k)
+        observation.set_attribute("used_cross_encoder", False)
+        observation.set_attribute("final_docs", len(deduped))
+        logger.info(
+            "Retriever completed",
+            extra={
+                "event": "retrieval.completed",
+                "candidate_docs": len(candidate_docs),
+                "stage1_docs": len(stage1_docs),
+                "merged_docs": len(merged_docs),
+                "stage3_docs": len(stage3_docs),
+                "final_docs": len(deduped),
+                "used_cross_encoder": False,
+                "used_parent_merge": True,
+            },
+        )
+        return deduped

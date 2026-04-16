@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
@@ -20,6 +21,7 @@ NORMALIZE_EMBEDDINGS = os.getenv("NORMALIZE_EMBEDDINGS", "true").lower() == "tru
 HF_CACHE_DIR = os.getenv("HF_HOME", None)
 
 _EMBEDDINGS = None
+logger = logging.getLogger(__name__)
 
 
 def get_device() -> str:
@@ -36,12 +38,16 @@ def get_embedding_model():
 
     device = get_device()
 
-    print("=" * 80)
-    print(f"[INFO] Loading embedding model: {MODEL_NAME}")
-    print(f"[INFO] Embedding device: {device}")
-    print(f"[INFO] Embedding batch size: {EMBEDDING_BATCH_SIZE}")
-    print(f"[INFO] Normalize embeddings: {NORMALIZE_EMBEDDINGS}")
-    print("=" * 80)
+    logger.info(
+        "Loading embedding model",
+        extra={
+            "event": "embeddings.load.started",
+            "model_name": MODEL_NAME,
+            "device": device,
+            "batch_size": EMBEDDING_BATCH_SIZE,
+            "normalize_embeddings": NORMALIZE_EMBEDDINGS,
+        },
+    )
 
     _EMBEDDINGS = HuggingFaceEmbeddings(
         model_name=MODEL_NAME,
@@ -60,5 +66,8 @@ def get_embedding_model():
     setattr(_EMBEDDINGS, "_runtime_model_name", MODEL_NAME)
     setattr(_EMBEDDINGS, "_runtime_batch_size", EMBEDDING_BATCH_SIZE)
 
-    print("[DONE] Embedding model loaded successfully.")
+    logger.info(
+        "Embedding model loaded successfully",
+        extra={"event": "embeddings.load.completed", "model_name": MODEL_NAME},
+    )
     return _EMBEDDINGS
