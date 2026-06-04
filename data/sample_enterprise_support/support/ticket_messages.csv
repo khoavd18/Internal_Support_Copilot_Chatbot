@@ -1,0 +1,81 @@
+message_id,ticket_id,author_type,author_id,created_at,visibility,message_type,body,sentiment,contains_action_item
+msg_001,tkt_001,customer,cust_001,2026-05-01T09:16:00Z,public,question,The nightly batch job now receives 504 errors after five minutes,urgent,true
+msg_002,tkt_001,support,support_001,2026-05-01T09:24:00Z,public,reply,We are checking gateway latency and will update before the SLA window,urgent,true
+msg_003,tkt_001,engineering,eng_api,2026-05-01T10:05:00Z,internal,note,Gateway shard east shows queue saturation during batch sync,urgent,true
+msg_004,tkt_002,customer,cust_002,2026-05-02T08:21:00Z,public,question,Users are redirected back to the sign in page after SSO,frustrated,true
+msg_005,tkt_002,support,support_002,2026-05-02T08:45:00Z,public,reply,Please send the new IdP metadata fingerprint from your admin console,neutral,true
+msg_006,tkt_002,support,support_002,2026-05-02T10:50:00Z,internal,note,Metadata cache may not have refreshed for the tenant,neutral,true
+msg_007,tkt_003,customer,cust_003,2026-05-02T11:05:00Z,public,question,The renewal invoice appears to charge ten duplicate seats,neutral,true
+msg_008,tkt_003,support,support_003,2026-05-02T11:42:00Z,public,reply,We are reviewing the renewal ledger and will confirm refund eligibility,neutral,true
+msg_009,tkt_003,customer,cust_003,2026-05-02T12:20:00Z,public,reply,Finance can provide the original purchase order if needed,neutral,true
+msg_010,tkt_004,customer,cust_004,2026-05-03T07:32:00Z,public,question,Updated contacts no longer appear in our CRM integration,frustrated,true
+msg_011,tkt_004,support,support_004,2026-05-03T07:58:00Z,public,reply,We are checking sync logs for contact update events,neutral,true
+msg_012,tkt_004,engineering,eng_integrations,2026-05-03T09:30:00Z,internal,handoff,Sync worker skipped records with blank external IDs,neutral,true
+msg_013,tkt_005,customer,cust_005,2026-05-03T14:12:00Z,public,question,Large exports stop near 80 percent and never finish,frustrated,true
+msg_014,tkt_005,support,support_005,2026-05-03T14:40:00Z,public,reply,We are testing the export with the same filters in a safe tenant copy,neutral,true
+msg_015,tkt_005,engineering,eng_data,2026-05-03T16:10:00Z,internal,note,Export worker memory pressure appears after six million rows,neutral,true
+msg_016,tkt_006,customer,cust_006,2026-05-04T09:41:00Z,public,question,New admins cannot complete MFA enrollment after promotion,frustrated,true
+msg_017,tkt_006,support,support_002,2026-05-04T10:05:00Z,public,reply,We refreshed the admin policy and asked the user to retry enrollment,neutral,true
+msg_018,tkt_006,system,system,2026-05-04T15:00:00Z,public,status_change,Ticket moved to resolved after successful enrollment,positive,false
+msg_019,tkt_007,customer,cust_007,2026-05-04T13:08:00Z,public,question,Our clients get 429 responses below the agreed quota,neutral,true
+msg_020,tkt_007,support,support_001,2026-05-04T13:35:00Z,public,reply,We found burst tokens resetting slowly and applied a quota refresh,neutral,true
+msg_021,tkt_007,customer,cust_007,2026-05-05T09:00:00Z,public,reply,The API client has run without 429 responses for two hours,positive,false
+msg_022,tkt_008,customer,cust_008,2026-05-05T10:02:00Z,public,question,Can the canceled pilot invoice be refunded,neutral,true
+msg_023,tkt_008,support,support_003,2026-05-05T10:30:00Z,public,reply,The refund policy allows pilot refunds before production activation,neutral,true
+msg_024,tkt_008,system,system,2026-05-05T12:00:00Z,public,status_change,Ticket closed after refund guidance was accepted,positive,false
+msg_025,tkt_009,customer,cust_009,2026-05-05T15:17:00Z,public,question,The billing owner cannot access invoices after a permission update,urgent,true
+msg_026,tkt_009,support,support_002,2026-05-05T15:50:00Z,public,reply,We are validating the billing owner role and portal permissions,neutral,true
+msg_027,tkt_009,engineering,eng_identity,2026-05-06T08:10:00Z,internal,note,Role propagation failed after the permission migration,neutral,true
+msg_028,tkt_010,customer,cust_010,2026-05-06T06:52:00Z,public,question,How long do archived export files remain available,neutral,true
+msg_029,tkt_010,support,support_005,2026-05-06T07:20:00Z,public,reply,Archived export files remain available according to the retention policy,neutral,false
+msg_030,tkt_010,system,system,2026-05-06T09:00:00Z,public,status_change,Ticket closed after policy answer was accepted,positive,false
+msg_031,tkt_011,customer,cust_001,2026-05-06T10:26:00Z,public,question,Salesforce sync stopped without warning after the token expired,frustrated,true
+msg_032,tkt_011,support,support_004,2026-05-06T10:55:00Z,public,reply,We are restoring the token and checking why the expiry alert did not fire,neutral,true
+msg_033,tkt_011,engineering,eng_integrations,2026-05-07T09:40:00Z,internal,note,Token expiry alert job skipped tenants with legacy OAuth apps,neutral,true
+msg_034,tkt_012,customer,cust_002,2026-05-07T08:07:00Z,public,question,Webhook callbacks are delayed by about thirty minutes,frustrated,true
+msg_035,tkt_012,support,support_001,2026-05-07T08:30:00Z,public,reply,We identified a notification queue delay and are draining the backlog,neutral,true
+msg_036,tkt_012,engineering,eng_notifications,2026-05-07T16:20:00Z,internal,note,Notification worker pool was scaled to clear delayed callbacks,neutral,false
+msg_037,tkt_013,customer,cust_003,2026-05-07T14:22:00Z,public,question,SCIM groups sync but roles do not update,neutral,true
+msg_038,tkt_013,support,support_002,2026-05-07T15:10:00Z,public,reply,We found the group mapping rule and asked for a test user confirmation,neutral,true
+msg_039,tkt_013,customer,cust_003,2026-05-08T10:00:00Z,public,reply,The test user received the expected role after the mapping change,positive,false
+msg_040,tkt_014,customer,cust_004,2026-05-08T07:12:00Z,public,question,Finance cannot see whether the credit memo was approved,neutral,true
+msg_041,tkt_014,support,support_003,2026-05-08T08:00:00Z,public,reply,We checked the billing ledger and the credit memo is approved,neutral,false
+msg_042,tkt_014,system,system,2026-05-08T12:55:00Z,public,status_change,Ticket resolved with credit memo reference sent to customer,positive,false
+msg_043,tkt_015,customer,cust_005,2026-05-08T13:48:00Z,public,question,API latency in LATAM is above our normal baseline,frustrated,true
+msg_044,tkt_015,support,support_001,2026-05-08T14:30:00Z,public,reply,We are comparing regional latency before and after the deploy,neutral,true
+msg_045,tkt_015,engineering,eng_api,2026-05-09T08:50:00Z,internal,note,Regional cache warmup was disabled for LATAM workers,neutral,true
+msg_046,tkt_016,customer,cust_006,2026-05-09T09:02:00Z,public,question,Our sandbox OAuth callback URL is rejected during authorization,neutral,true
+msg_047,tkt_016,support,support_004,2026-05-09T09:50:00Z,public,reply,The sandbox app used the production callback allowlist,neutral,true
+msg_048,tkt_016,system,system,2026-05-09T16:40:00Z,public,status_change,Ticket closed after callback configuration was corrected,positive,false
+msg_049,tkt_017,customer,cust_007,2026-05-09T11:33:00Z,public,question,Custom fields are missing from the scheduled export,neutral,true
+msg_050,tkt_017,support,support_005,2026-05-09T12:15:00Z,public,reply,We added the custom field schema flag and queued a fresh export,neutral,true
+msg_051,tkt_017,customer,cust_007,2026-05-10T08:30:00Z,public,reply,The new export includes the expected custom fields,positive,false
+msg_052,tkt_018,customer,cust_008,2026-05-10T10:07:00Z,public,question,The admin lost the MFA device and needs a reset,urgent,true
+msg_053,tkt_018,support,support_002,2026-05-10T10:25:00Z,public,reply,We verified the requester and started the secure MFA reset flow,neutral,true
+msg_054,tkt_018,system,system,2026-05-10T11:10:00Z,public,status_change,Ticket resolved after reset confirmation,positive,false
+msg_055,tkt_019,customer,cust_009,2026-05-10T15:52:00Z,public,question,Payment API calls are failing in production and this is a Sev1 outage,urgent,true
+msg_056,tkt_019,support,support_001,2026-05-10T16:00:00Z,public,reply,We declared an incident bridge and escalated to the API on call team,urgent,true
+msg_057,tkt_019,engineering,eng_api,2026-05-10T16:20:00Z,internal,handoff,Gateway deployment is rolling back because payment route health checks failed,urgent,true
+msg_058,tkt_020,customer,cust_010,2026-05-11T06:47:00Z,public,question,The ERP connector retries duplicate order creation,frustrated,true
+msg_059,tkt_020,support,support_004,2026-05-11T07:25:00Z,public,reply,We disabled retry on duplicate order responses and are checking idempotency keys,neutral,true
+msg_060,tkt_020,engineering,eng_integrations,2026-05-11T11:40:00Z,internal,note,Connector now preserves idempotency keys during retry,neutral,false
+msg_061,tkt_021,customer,cust_001,2026-05-11T10:35:00Z,public,question,Can we schedule weekly exports for audit review,neutral,true
+msg_062,tkt_021,support,support_005,2026-05-11T11:15:00Z,public,reply,Weekly exports can be scheduled from the data export settings page,neutral,false
+msg_063,tkt_022,customer,cust_002,2026-05-12T09:25:00Z,public,question,Where should we submit the tax exemption certificate,neutral,true
+msg_064,tkt_022,support,support_003,2026-05-12T10:15:00Z,public,reply,Upload the certificate in billing settings and reply with the document ID,neutral,true
+msg_065,tkt_023,customer,cust_003,2026-05-12T13:28:00Z,public,question,Rotated API keys work locally but fail in our deploy pipeline,frustrated,true
+msg_066,tkt_023,support,support_001,2026-05-12T13:55:00Z,public,reply,The deploy environment still references the retired key alias,neutral,true
+msg_067,tkt_024,customer,cust_004,2026-05-13T08:42:00Z,public,question,Login succeeds in Chrome but Edge shows stale session,neutral,true
+msg_068,tkt_024,support,support_002,2026-05-13T09:20:00Z,public,reply,Clear the Edge session cookie and retry after the session policy refresh,neutral,false
+msg_069,tkt_025,customer,cust_005,2026-05-13T12:02:00Z,public,question,Slack alerts go to the default channel instead of the mapped channel,neutral,true
+msg_070,tkt_025,support,support_004,2026-05-13T12:50:00Z,public,reply,We updated the channel mapping cache and asked for a test alert,neutral,true
+msg_071,tkt_026,customer,cust_006,2026-05-14T09:18:00Z,public,question,Does the recent latency breach qualify for SLA credits,neutral,true
+msg_072,tkt_026,support,support_003,2026-05-14T09:55:00Z,public,reply,We are reviewing the SLA policy and incident timeline before confirming credit eligibility,neutral,true
+msg_073,tkt_027,customer,cust_007,2026-05-14T14:28:00Z,public,question,The export API returns only one page even when more data exists,frustrated,true
+msg_074,tkt_027,support,support_005,2026-05-14T15:00:00Z,public,reply,We reproduced the pagination issue and escalated to data platform engineering,neutral,true
+msg_075,tkt_028,customer,cust_008,2026-05-15T10:12:00Z,public,question,New admins cannot invite teammates from workspace settings,neutral,true
+msg_076,tkt_028,support,support_002,2026-05-15T10:45:00Z,public,reply,We are checking whether the admin role has the invite permission flag,neutral,true
+msg_077,tkt_029,customer,cust_009,2026-05-15T16:32:00Z,public,question,The payment integration disconnects several times each day,urgent,true
+msg_078,tkt_029,support,support_004,2026-05-15T16:42:00Z,public,reply,We escalated to integration engineering and opened an incident bridge,urgent,true
+msg_079,tkt_030,customer,cust_010,2026-05-16T07:52:00Z,public,question,How do we change the billing contact before renewal,neutral,true
+msg_080,tkt_030,support,support_003,2026-05-16T08:20:00Z,public,reply,The current billing owner can update the contact from billing settings,neutral,false

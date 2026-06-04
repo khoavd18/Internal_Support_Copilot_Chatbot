@@ -1,0 +1,11 @@
+account_id,account_name,industry,segment,region,account_owner,contract_start_date,contract_end_date,arr_usd,health_score,risk_level,created_at
+acct_001,Northstar Analytics,Analytics,strategic,NA,team_east,2025-01-01,2026-12-31,420000,42,high,2025-01-01T09:00:00Z
+acct_002,BluePeak Retail,Retail,enterprise,EMEA,team_emea,2025-02-01,2027-01-31,310000,68,medium,2025-02-01T09:00:00Z
+acct_003,Vertex BioHealth,Healthcare,strategic,NA,team_life_sciences,2025-03-01,2027-02-28,560000,55,high,2025-03-01T09:00:00Z
+acct_004,OrbitPay Financial,Fintech,mid_market,APAC,team_apac,2025-04-01,2026-03-31,180000,74,medium,2025-04-01T09:00:00Z
+acct_005,Canyon Logistics,Logistics,mid_market,LATAM,team_south,2025-05-01,2026-04-30,145000,81,low,2025-05-01T09:00:00Z
+acct_006,Atlas Education,Education,enterprise,NA,team_east,2025-06-01,2027-05-31,260000,63,medium,2025-06-01T09:00:00Z
+acct_007,Redwood Manufacturing,Manufacturing,enterprise,EMEA,team_emea,2025-07-01,2027-06-30,390000,49,high,2025-07-01T09:00:00Z
+acct_008,SummitCloud Services,Technology,startup,NA,team_growth,2025-08-01,2026-07-31,85000,70,medium,2025-08-01T09:00:00Z
+acct_009,HarborBank Digital,Financial Services,strategic,NA,team_finserv,2025-09-01,2027-08-31,720000,38,critical,2025-09-01T09:00:00Z
+acct_010,Greenfield Energy,Energy,enterprise,APAC,team_apac,2025-10-01,2027-09-30,330000,86,low,2025-10-01T09:00:00Z

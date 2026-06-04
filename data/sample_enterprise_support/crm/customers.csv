@@ -1,0 +1,11 @@
+customer_id,account_id,full_name,email,role,region,timezone,created_at,status,support_tier,preferred_contact_channel
+cust_001,acct_001,Avery Chen,avery.chen@northstar.example.com,admin,NA,America/New_York,2025-01-03T10:00:00Z,active,enterprise,slack
+cust_002,acct_002,Mina Patel,mina.patel@bluepeak.example.com,developer,EMEA,Europe/London,2025-02-03T10:00:00Z,active,enterprise,portal
+cust_003,acct_003,Jonah Brooks,jonah.brooks@vertexbio.example.com,executive_sponsor,NA,America/Chicago,2025-03-03T10:00:00Z,active,enterprise,email
+cust_004,acct_004,Leah Kim,leah.kim@orbitpay.example.com,admin,APAC,Asia/Singapore,2025-04-03T10:00:00Z,active,premium,slack
+cust_005,acct_005,Marco Silva,marco.silva@canyonlogistics.example.com,developer,LATAM,America/Sao_Paulo,2025-05-03T10:00:00Z,active,premium,email
+cust_006,acct_006,Nora Evans,nora.evans@atlasedu.example.com,admin,NA,America/Los_Angeles,2025-06-03T10:00:00Z,active,enterprise,portal
+cust_007,acct_007,Owen Fischer,owen.fischer@redwoodmfg.example.com,developer,EMEA,Europe/Berlin,2025-07-03T10:00:00Z,active,enterprise,email
+cust_008,acct_008,Priya Raman,priya.raman@summitcloud.example.com,billing_owner,NA,America/Denver,2025-08-03T10:00:00Z,trial,standard,chat
+cust_009,acct_009,Sam Rivera,sam.rivera@harborbank.example.com,security_admin,NA,America/New_York,2025-09-03T10:00:00Z,active,enterprise,phone
+cust_010,acct_010,Tara Nguyen,tara.nguyen@greenfieldenergy.example.com,admin,APAC,Australia/Sydney,2025-10-03T10:00:00Z,active,premium,portal

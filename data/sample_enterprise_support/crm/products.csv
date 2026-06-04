@@ -1,0 +1,6 @@
+product_id,product_name,product_family,service_id,plan_name,lifecycle_stage,support_owner_team,engineering_owner_team,docs_url
+prod_api,Developer API,platform,svc_api_gateway,Enterprise API,ga,api_support,eng_api_platform,https://docs.example.com/api
+prod_identity,Identity Suite,identity,svc_auth,Enterprise Identity,ga,identity_support,eng_identity,https://docs.example.com/identity
+prod_billing,Billing Hub,billing,svc_billing,Revenue Operations,ga,billing_support,eng_revenue,https://docs.example.com/billing
+prod_data_export,Data Export,data,svc_data_export,Data Portability,ga,data_support,eng_data_platform,https://docs.example.com/data-export
+prod_integrations,Integration Connect,integrations,svc_integration_sync,Enterprise Connect,ga,integration_support,eng_integrations,https://docs.example.com/integrations
