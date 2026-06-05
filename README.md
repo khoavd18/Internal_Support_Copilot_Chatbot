@@ -55,9 +55,11 @@ Secret-handling notes live in [docs/SECURITY.md](./docs/SECURITY.md).
 |-- tests/
 |-- data_source/
 |-- eval/
+|-- .github/workflows/
 |-- .env.example
 |-- Dockerfile
 |-- docker-compose.yml
+|-- Makefile
 |-- pyproject.toml
 |-- pytest.ini
 |-- requirements.txt
@@ -68,14 +70,18 @@ Secret-handling notes live in [docs/SECURITY.md](./docs/SECURITY.md).
 - `pyproject.toml`: package metadata plus mirrored runtime/dev dependency declarations.
 - `requirements.txt`: runtime install list.
 - `requirements-dev.txt`: runtime dependencies plus test/lint tooling.
+- `scripts/dev.py`: canonical cross-platform wrapper for install, test, run, ingest, and evaluation commands.
+- `Makefile`: optional shortcuts for systems with `make`; it delegates to `scripts/dev.py` or standard Python module commands.
 - No lock file is currently committed; the files above are kept in sync for local bootstrap.
 
 ## Bootstrap
 
+Use Python `3.10` or `3.11`. The examples below use one supported version explicitly; replace it with the supported minor version installed on your machine.
+
 ### Windows
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 python scripts/dev.py install
 Copy-Item .env.example .env
@@ -99,7 +105,7 @@ python scripts/dev.py run-tests
 ### Linux/macOS
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python scripts/dev.py install
 cp .env.example .env
@@ -133,6 +139,38 @@ python scripts/dev.py run-tests
 You can pass extra flags to the wrapped command after `--`.
 Example: `python scripts/dev.py run-api -- --host 0.0.0.0 --port 8000`
 
+Optional Makefile shortcuts are available on systems with `make`:
+
+```bash
+make install
+make docker-infra
+make ingest
+make run-api
+make run-ui
+make test-unit
+make eval-retrieval
+make eval-answers
+```
+
+### Enterprise Support Sample Data
+
+The synthetic enterprise support dataset lives under `data/sample_enterprise_support/`.
+It is separate from the existing GitHub Docs/GitLab/GitHub Issues ingestion pipeline.
+
+Validate and preview the generated RAG documents without writing to Qdrant:
+
+```bash
+python scripts/ingest_enterprise_support_data.py --dry-run
+```
+
+Ingest the enterprise support documents into a separate Qdrant collection:
+
+```bash
+python scripts/ingest_enterprise_support_data.py --collection-name enterprise_support_copilot_qdrant
+```
+
+To query that collection through the API, start the API with `QDRANT_COLLECTION_NAME=enterprise_support_copilot_qdrant`. To intentionally mix enterprise support documents into the default collection, pass the same collection name used by your normal `QDRANT_COLLECTION_NAME`.
+
 ## Local Deployment
 
 Two practical local modes are supported:
@@ -153,15 +191,15 @@ A concise stack diagram and the full startup notes live in [docs/DEPLOYMENT.md](
 
 ## Startup Assumptions
 
-- Python `3.10+` is required. The CI workflow currently exercises Python `3.10` and `3.11`.
+- Python `>=3.10,<3.12` is supported. The CI workflow exercises Python `3.10` and `3.11`; the Docker image uses Python `3.11`.
 - The default `.env` assumes Qdrant is available at `http://localhost:6333`, which is what `docker compose up -d qdrant redis` starts.
 - The containerized API service overrides `QDRANT_URL` and `REDIS_URL` to use Docker service names, so you do not need a separate container-only env file.
 - The default `.env.example` also assumes Redis is available at `redis://localhost:6379/0` for persistent chat/session and checkpoint storage.
 - The containerized UI service overrides `INTERNAL_SUPPORT_API_BASE_URL` to `http://api:8000`.
-- Fresh clones do not include `data_source/processed`; you must place source content under `data_source/raw` and run `python scripts/dev.py ingest-data`.
+- Fresh clones include a processed snapshot under `data_source/processed` for demo/evaluation use. Raw source material is expected under `data_source/raw` and is kept out of version control; to rebuild the processed snapshot, add raw sources and run `python scripts/dev.py ingest-data`.
 - `ingest-data` prepares JSONL files and rebuilds the Qdrant collection, so Qdrant must be running before you call it.
 - The API validates environment configuration at startup and will fail fast if enabled features are missing required settings.
-- The first real API/UI run may download Hugging Face models. On CPU-only machines, set `LLM_QUANTIZATION=none` in `.env` to avoid 4-bit/8-bit assumptions.
+- The first real API/UI run may download Hugging Face models. `.env.example` defaults to `LLM_QUANTIZATION=none` for CPU-only machines; set `LLM_QUANTIZATION=4bit` or `8bit` only when CUDA and bitsandbytes are available.
 - GitHub and local git write actions are disabled by default and require extra environment configuration before use.
 - Authorization is enabled by default. Anonymous requests are treated as `viewer`, while write-capable requests require `X-User-ID` and `X-User-Role: operator`.
 
@@ -306,6 +344,12 @@ Run the focused test suite:
 python scripts/dev.py run-tests
 ```
 
+Run the CI-equivalent unit subset:
+
+```bash
+python -m pytest -m "not integration" -q
+```
+
 Run the retrieval benchmark:
 
 ```bash
@@ -329,6 +373,7 @@ Run lint locally:
 
 ```bash
 ruff check .
+ruff format --check .
 ```
 
 Run a narrower regression set used during recent cleanup:
@@ -359,7 +404,7 @@ python -m pytest -m "not integration" -q
 - Keep secrets in `.env`; never commit real credentials.
 - Prefer storing the GitHub App PEM outside the repo and referencing it with `GITHUB_PRIVATE_KEY_PATH`.
 - If Redis or Qdrant use credentials, keep them only in local environment variables.
-- Generated data under `data_source/processed` is intentionally ignored.
+- Existing `data_source/processed` files are tracked as a processed snapshot. Regenerated or additional processed artifacts should only be committed deliberately.
 - GitHub write actions are protected by explicit feature flags and confirmation fields.
 - Local git commit actions are restricted by allowed root configuration.
 - Repeated write requests are guarded by persisted idempotency records with statuses such as `pending`, `running`, `succeeded`, and `failed`.
@@ -381,10 +426,10 @@ python -m pytest -m "not integration" -q
 
 ## Fresh Clone Checklist
 
-- Create and activate a Python `3.10+` virtual environment.
+- Create and activate a Python `3.10` or `3.11` virtual environment.
 - Run `python scripts/dev.py install`.
 - Copy `.env.example` to `.env`.
-- Start Qdrant with `docker compose up -d`.
+- Start Qdrant and Redis with `docker compose up -d qdrant redis`.
 - Add source content under `data_source/raw`.
 - Run `python scripts/dev.py ingest-data`.
 - Start the API with `python scripts/dev.py run-api`.
