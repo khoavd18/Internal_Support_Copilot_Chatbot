@@ -441,6 +441,42 @@ python scripts/dev.py benchmark-answers
 It reuses the same benchmark case file, generates answers through the local pipeline, and scores practical dimensions such as correctness, groundedness, citation relevance, and completeness.
 Outputs are written to timestamped files under `eval/runs/` and `eval/reports/`.
 
+Run the enterprise support evaluation without Qdrant:
+
+```bash
+python eval/evaluate_enterprise_support.py --dry-run
+```
+
+Dry-run mode uses local lexical retrieval over `data/sample_enterprise_support/` plus the in-memory Knowledge Graph. It computes Recall@5 over expected entity IDs, source-type hit rate, a metadata-based groundedness proxy, and a missing-information handling proxy.
+
+Run against the GraphRAG retrieval path after ingesting the enterprise collection into Qdrant:
+
+```bash
+python scripts/ingest_enterprise_support_data.py --collection-name enterprise_support_copilot_qdrant
+QDRANT_COLLECTION_NAME=enterprise_support_copilot_qdrant python eval/evaluate_enterprise_support.py
+```
+
+On Windows PowerShell:
+
+```powershell
+python scripts/ingest_enterprise_support_data.py --collection-name enterprise_support_copilot_qdrant
+$env:QDRANT_COLLECTION_NAME = "enterprise_support_copilot_qdrant"
+python eval/evaluate_enterprise_support.py
+```
+
+Use `--limit N` for a smaller smoke test:
+
+```bash
+python eval/evaluate_enterprise_support.py --dry-run --limit 5
+```
+
+### Enterprise Evaluation Snapshot
+
+| Mode | Recall@5 | Source Type Hit Rate | Groundedness Proxy | Missing-Info Proxy | Notes |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Dry-run local lexical + KG | 0.6788 | 1.0000 | 1.0000 | 1.0000 | No Qdrant required; useful for query-label validation and regression smoke tests. |
+| Qdrant GraphRAG | TBD | TBD | TBD | TBD | Requires local Qdrant with the enterprise support collection ingested. |
+
 Run lint locally:
 
 ```bash
