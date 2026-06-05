@@ -39,6 +39,8 @@ from src.core.schema import (
     CreateRepoRequest,
     CustomerSummaryRequest,
     CustomerSummaryResponse,
+    GraphRAGAskRequest,
+    GraphRAGAskResponse,
     SlaCheckResponse,
     SuggestedReplyResponse,
     TicketAutomationRequest,
@@ -54,6 +56,7 @@ from src.data.enterprise_support_service import (
     triage_ticket,
 )
 from src.pipeline import build_pipeline, get_default_pipeline
+from src.rag.graphrag import format_context_for_answer, retrieve_enterprise_context
 
 configure_logging(force=True)
 
@@ -364,6 +367,27 @@ def _raise_enterprise_support_error(exc: Exception) -> None:
     ) from exc
 
 
+def _build_graphrag_placeholder_answer(question: str, context: Dict[str, Any]) -> str:
+    merged_count = len(context.get("merged_context") or [])
+    vector_count = len(context.get("vector_evidence") or [])
+    graph_count = len(context.get("graph_evidence") or [])
+
+    if merged_count == 0:
+        return (
+            "No enterprise support context was found for this question. "
+            "This endpoint does not call an LLM; it returns fused retrieval evidence for inspection."
+        )
+
+    return (
+        "GraphRAG evidence was retrieved for the enterprise support question. "
+        f"Question: {question.strip()} "
+        f"Fused evidence items: {merged_count} "
+        f"(vector={vector_count}, graph={graph_count}). "
+        "This first version returns a placeholder answer plus grounded evidence; "
+        "LLM answer generation has not been wired into this endpoint."
+    )
+
+
 @app.get("/health", tags=["system"])
 def health_check(request: Request) -> Dict[str, Any]:
     logger.info(
@@ -418,6 +442,39 @@ def support_sla_check(payload: TicketAutomationRequest) -> SlaCheckResponse:
         return SlaCheckResponse(**check_ticket_sla(payload.ticket_id))
     except Exception as exc:
         _raise_enterprise_support_error(exc)
+
+
+@app.post("/enterprise/ask", response_model=GraphRAGAskResponse, tags=["enterprise"])
+def enterprise_ask(payload: GraphRAGAskRequest) -> GraphRAGAskResponse:
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question must not be empty.")
+
+    try:
+        context = retrieve_enterprise_context(
+            question,
+            top_k=payload.top_k,
+            graph_depth=payload.graph_depth,
+        )
+        return GraphRAGAskResponse(
+            answer=_build_graphrag_placeholder_answer(question, context),
+            vector_evidence=context.get("vector_evidence", []),
+            graph_evidence=context.get("graph_evidence", []),
+            merged_context=context.get("merged_context", []),
+            citations=context.get("citations", []),
+            metadata={
+                "formatted_context": format_context_for_answer(context),
+                "query": question,
+                "mode": "graphrag_placeholder",
+            },
+            stats=context.get("stats", {}),
+        )
+    except Exception:
+        logger.exception(
+            "Enterprise GraphRAG endpoint failed",
+            extra={"event": "enterprise.graphrag.failed"},
+        )
+        raise HTTPException(status_code=500, detail="Enterprise GraphRAG request failed.")
 
 
 @app.post("/ask", response_model=AskResponse, tags=["chat"])

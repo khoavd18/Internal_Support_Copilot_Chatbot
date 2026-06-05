@@ -171,6 +171,22 @@ python scripts/ingest_enterprise_support_data.py --collection-name enterprise_su
 
 To query that collection through the API, start the API with `QDRANT_COLLECTION_NAME=enterprise_support_copilot_qdrant`. To intentionally mix enterprise support documents into the default collection, pass the same collection name used by your normal `QDRANT_COLLECTION_NAME`.
 
+### Enterprise GraphRAG Fusion
+
+The enterprise support path now includes a lightweight in-memory Knowledge Graph and a simple GraphRAG fusion layer. The fusion layer tries vector retrieval first, retrieves related graph context from the synthetic enterprise support KG, deduplicates evidence by stable entity IDs, and marks each context item as `vector`, `graph`, or `both`.
+
+The first `/enterprise/ask` version does not call an LLM. It returns a placeholder answer plus the fused evidence so retrieval behavior can be inspected safely:
+
+```bash
+curl -X POST http://127.0.0.1:8000/enterprise/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Why is the API timeout risky for Northstar?",
+    "top_k": 5,
+    "graph_depth": 2
+  }'
+```
+
 ## Local Deployment
 
 Two practical local modes are supported:

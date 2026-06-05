@@ -68,3 +68,80 @@ def test_enterprise_support_endpoints_return_404_for_unknown_ids() -> None:
 
     assert response.status_code == 404
     assert "Ticket not found" in response.json()["detail"]
+
+
+def test_enterprise_ask_endpoint_returns_graphrag_evidence(monkeypatch) -> None:
+    def _fake_retrieve_enterprise_context(query: str, top_k: int, graph_depth: int):
+        assert query == "Why is the API timeout risky?"
+        assert top_k == 2
+        assert graph_depth == 1
+        return {
+            "vector_evidence": [
+                {
+                    "id": "Ticket:tkt_001",
+                    "text": "Vector ticket evidence",
+                    "metadata": {"ticket_id": "tkt_001", "source_type": "ticket"},
+                    "context_source": "vector",
+                    "source_type": "ticket",
+                    "title": "API timeout during batch sync",
+                }
+            ],
+            "graph_evidence": [
+                {
+                    "id": "RiskEvent:risk_001",
+                    "text": "Graph risk evidence",
+                    "metadata": {"risk_event_id": "risk_001", "source_type": "risk_event"},
+                    "context_source": "graph",
+                    "source_type": "risk_event",
+                    "title": "P1 API timeout breached resolution target",
+                }
+            ],
+            "merged_context": [
+                {
+                    "id": "Ticket:tkt_001",
+                    "text": "Merged ticket evidence",
+                    "metadata": {"ticket_id": "tkt_001", "source_type": "ticket"},
+                    "context_source": "both",
+                    "source_type": "ticket",
+                    "title": "API timeout during batch sync",
+                }
+            ],
+            "citations": [
+                {
+                    "index": 1,
+                    "id": "Ticket:tkt_001",
+                    "title": "API timeout during batch sync",
+                    "source_type": "ticket",
+                    "context_source": "both",
+                    "metadata": {"ticket_id": "tkt_001"},
+                }
+            ],
+            "stats": {
+                "top_k": top_k,
+                "graph_depth": graph_depth,
+                "merged_count": 1,
+                "vector_error": "",
+            },
+        }
+
+    monkeypatch.setattr(
+        "src.api.main.retrieve_enterprise_context", _fake_retrieve_enterprise_context
+    )
+
+    response = client.post(
+        "/enterprise/ask",
+        json={
+            "question": "Why is the API timeout risky?",
+            "top_k": 2,
+            "graph_depth": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "GraphRAG evidence was retrieved" in body["answer"]
+    assert body["vector_evidence"][0]["id"] == "Ticket:tkt_001"
+    assert body["graph_evidence"][0]["id"] == "RiskEvent:risk_001"
+    assert body["merged_context"][0]["context_source"] == "both"
+    assert body["citations"][0]["id"] == "Ticket:tkt_001"
+    assert body["metadata"]["mode"] == "graphrag_placeholder"
