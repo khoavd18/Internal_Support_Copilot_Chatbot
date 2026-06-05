@@ -7,7 +7,6 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
 from src.agent.action_registry import (
     detect_action_request,
     execute_registered_action,
@@ -29,7 +28,7 @@ from src.core.auth import (
 )
 from src.core.logging_utils import bind_log_context, configure_logging
 from src.core.observability import observe_duration
-from src.core.security import sanitize_error_text
+from src.core.runtime_checks import build_readiness_report, validate_environment_settings
 from src.core.schema import (
     AgentAskRequest,
     AgentResponse,
@@ -38,9 +37,22 @@ from src.core.schema import (
     CommitRequest,
     CreateIssueRequest,
     CreateRepoRequest,
+    CustomerSummaryRequest,
+    CustomerSummaryResponse,
+    SlaCheckResponse,
+    SuggestedReplyResponse,
+    TicketAutomationRequest,
+    TicketTriageResponse,
 )
-from src.core.runtime_checks import build_readiness_report, validate_environment_settings
+from src.core.security import sanitize_error_text
 from src.core.settings import API_CORS_ORIGINS
+from src.data.enterprise_support_service import (
+    EnterpriseSupportDataError,
+    build_customer_summary,
+    check_ticket_sla,
+    suggest_ticket_reply,
+    triage_ticket,
+)
 from src.pipeline import build_pipeline, get_default_pipeline
 
 configure_logging(force=True)
@@ -338,6 +350,20 @@ def _execute_registered_action_request(
             raise HTTPException(status_code=500, detail=failure_detail)
 
 
+def _raise_enterprise_support_error(exc: Exception) -> None:
+    if isinstance(exc, EnterpriseSupportDataError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    logger.exception(
+        "Enterprise support automation endpoint failed",
+        extra={"event": "enterprise_support.endpoint.failed"},
+    )
+    raise HTTPException(
+        status_code=500,
+        detail="Failed to process enterprise support request.",
+    ) from exc
+
+
 @app.get("/health", tags=["system"])
 def health_check(request: Request) -> Dict[str, Any]:
     logger.info(
@@ -360,6 +386,38 @@ def readiness_check() -> JSONResponse:
         },
     )
     return JSONResponse(status_code=status_code, content=payload)
+
+
+@app.post("/crm/customer-summary", response_model=CustomerSummaryResponse, tags=["crm"])
+def crm_customer_summary(payload: CustomerSummaryRequest) -> CustomerSummaryResponse:
+    try:
+        return CustomerSummaryResponse(**build_customer_summary(payload.customer_id))
+    except Exception as exc:
+        _raise_enterprise_support_error(exc)
+
+
+@app.post("/support/ticket-triage", response_model=TicketTriageResponse, tags=["support"])
+def support_ticket_triage(payload: TicketAutomationRequest) -> TicketTriageResponse:
+    try:
+        return TicketTriageResponse(**triage_ticket(payload.ticket_id))
+    except Exception as exc:
+        _raise_enterprise_support_error(exc)
+
+
+@app.post("/support/suggest-reply", response_model=SuggestedReplyResponse, tags=["support"])
+def support_suggest_reply(payload: TicketAutomationRequest) -> SuggestedReplyResponse:
+    try:
+        return SuggestedReplyResponse(**suggest_ticket_reply(payload.ticket_id))
+    except Exception as exc:
+        _raise_enterprise_support_error(exc)
+
+
+@app.post("/support/sla-check", response_model=SlaCheckResponse, tags=["support"])
+def support_sla_check(payload: TicketAutomationRequest) -> SlaCheckResponse:
+    try:
+        return SlaCheckResponse(**check_ticket_sla(payload.ticket_id))
+    except Exception as exc:
+        _raise_enterprise_support_error(exc)
 
 
 @app.post("/ask", response_model=AskResponse, tags=["chat"])

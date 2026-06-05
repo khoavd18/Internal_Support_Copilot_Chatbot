@@ -212,6 +212,38 @@ A concise stack diagram and the full startup notes live in [docs/DEPLOYMENT.md](
 
 ## Example API Usage
 
+### Customer summary
+
+```bash
+curl -X POST http://127.0.0.1:8000/crm/customer-summary \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_001"}'
+```
+
+### Ticket triage
+
+```bash
+curl -X POST http://127.0.0.1:8000/support/ticket-triage \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id": "tkt_001"}'
+```
+
+### Suggested support reply
+
+```bash
+curl -X POST http://127.0.0.1:8000/support/suggest-reply \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id": "tkt_001"}'
+```
+
+### SLA check
+
+```bash
+curl -X POST http://127.0.0.1:8000/support/sla-check \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id": "tkt_026"}'
+```
+
 ### Ask the multi-agent backend
 
 ```bash
