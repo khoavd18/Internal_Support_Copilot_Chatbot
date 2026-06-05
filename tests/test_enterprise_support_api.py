@@ -63,11 +63,32 @@ def test_sla_check_endpoint_uses_ticket_sla_fields_and_policy_context() -> None:
     assert body["policy"]["entity_id"] == "pol_sla"
 
 
+def test_customer_risk_score_endpoint_returns_explanation_and_events() -> None:
+    response = client.post("/risk/customer-score", json={"customer_id": "cust_009"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["customer_id"] == "cust_009"
+    assert 0 <= body["risk_score"] <= 100
+    assert body["risk_level"] in {"low", "medium", "high", "critical"}
+    assert body["top_reasons"]
+    assert any("escalation" in reason.lower() for reason in body["top_reasons"])
+    assert any(item["source_type"] == "risk_event" for item in body["related_events"])
+    assert body["features"]["negative_signal_count_30d"] >= 1
+
+
 def test_enterprise_support_endpoints_return_404_for_unknown_ids() -> None:
     response = client.post("/support/ticket-triage", json={"ticket_id": "tkt_missing"})
 
     assert response.status_code == 404
     assert "Ticket not found" in response.json()["detail"]
+
+
+def test_customer_risk_score_endpoint_returns_404_for_unknown_customer() -> None:
+    response = client.post("/risk/customer-score", json={"customer_id": "cust_missing"})
+
+    assert response.status_code == 404
+    assert "Customer not found" in response.json()["detail"]
 
 
 def test_enterprise_ask_endpoint_returns_graphrag_evidence(monkeypatch) -> None:

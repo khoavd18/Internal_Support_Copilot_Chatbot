@@ -187,6 +187,16 @@ curl -X POST http://127.0.0.1:8000/enterprise/ask \
   }'
 ```
 
+### Enterprise Risk Scoring
+
+The synthetic enterprise support path also includes a lightweight customer risk scorer. Because `scikit-learn` is not currently part of the project dependencies, this first version uses a deterministic heuristic anomaly baseline over recent tickets and risk events instead of `IsolationForest`.
+
+```bash
+curl -X POST http://127.0.0.1:8000/risk/customer-score \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_009"}'
+```
+
 ## Local Deployment
 
 Two practical local modes are supported:
@@ -260,6 +270,14 @@ curl -X POST http://127.0.0.1:8000/support/sla-check \
   -d '{"ticket_id": "tkt_026"}'
 ```
 
+### Customer risk score
+
+```bash
+curl -X POST http://127.0.0.1:8000/risk/customer-score \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_009"}'
+```
+
 ### Ask the multi-agent backend
 
 ```bash
@@ -316,6 +334,12 @@ curl -X POST http://127.0.0.1:8000/multi-agent/actions/create-repo \
 
 - `GET /health`
 - `GET /ready`
+- `POST /crm/customer-summary`
+- `POST /support/ticket-triage`
+- `POST /support/suggest-reply`
+- `POST /support/sla-check`
+- `POST /risk/customer-score`
+- `POST /enterprise/ask`
 - `POST /ask`
 - `POST /agent/ask`
 - `POST /multi-agent/ask`

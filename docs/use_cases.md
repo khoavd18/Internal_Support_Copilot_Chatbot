@@ -195,6 +195,8 @@ Explain why account acct_001 is marked high risk. Include tickets, incidents, se
 
 The copilot should explain the risk score using source evidence, group signals by cause, identify whether the risk is account, ticket, service, or incident related, and recommend mitigation steps.
 
+The implemented first version is available through `POST /risk/customer-score`. It scores a `customer_id` from recent synthetic tickets and risk events, returns a `risk_score`, `risk_level`, top contributing reasons, and related ticket or risk-event evidence. It uses a deterministic heuristic baseline because `scikit-learn` is not currently a project dependency.
+
 **Demo value**
 
 Shows future anomaly and risk scoring in an explainable form, while keeping the current implementation grounded in simple synthetic records.

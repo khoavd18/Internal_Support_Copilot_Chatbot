@@ -52,9 +52,12 @@ from src.data.enterprise_support_service import (
     EnterpriseSupportDataError,
     build_customer_summary,
     check_ticket_sla,
+    get_enterprise_support_dataset,
     suggest_ticket_reply,
     triage_ticket,
 )
+from src.ml.anomaly import RiskScoringError, explain_risk_score
+from src.ml.schemas import CustomerRiskScoreRequest, CustomerRiskScoreResponse
 from src.pipeline import build_pipeline, get_default_pipeline
 from src.rag.graphrag import format_context_for_answer, retrieve_enterprise_context
 
@@ -442,6 +445,21 @@ def support_sla_check(payload: TicketAutomationRequest) -> SlaCheckResponse:
         return SlaCheckResponse(**check_ticket_sla(payload.ticket_id))
     except Exception as exc:
         _raise_enterprise_support_error(exc)
+
+
+@app.post("/risk/customer-score", response_model=CustomerRiskScoreResponse, tags=["risk"])
+def risk_customer_score(payload: CustomerRiskScoreRequest) -> CustomerRiskScoreResponse:
+    try:
+        dataset = get_enterprise_support_dataset()
+        return CustomerRiskScoreResponse(**explain_risk_score(payload.customer_id, dataset))
+    except RiskScoringError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            "Customer risk scoring endpoint failed",
+            extra={"event": "risk.customer_score.failed"},
+        )
+        raise HTTPException(status_code=500, detail="Customer risk scoring failed.") from exc
 
 
 @app.post("/enterprise/ask", response_model=GraphRAGAskResponse, tags=["enterprise"])
