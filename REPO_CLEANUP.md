@@ -4,14 +4,10 @@ This cleanup focused on repository hygiene only. No application logic was change
 
 ## What Was Cleaned
 
-- Expanded `.gitignore` to better exclude Python caches, virtual environments, local secrets, logs, coverage outputs, editor junk, and packaging artifacts.
-- Removed generated repository artifacts that should stay local, including:
-  - `data_source/processed/`
-  - `eval/reports/*.txt`
-  - `pytest-cache-files-*`
-  - `__pycache__/` directories
-  - local archive artifacts such as `Internal_Support_Copilot.zip`
-- Updated `README.md` so the setup flow matches the cleaned repo state and explains that processed data must be generated locally.
+- Expanded `.gitignore` and `.dockerignore` to better exclude Python caches, virtual environments, local secrets, logs, coverage outputs, editor junk, model caches, and packaging artifacts.
+- Removed generated Python bytecode that should stay local, including `__pycache__/` directories and `*.pyc` files.
+- Kept application features and the existing processed snapshot intact; regenerated or additional `data_source/processed` outputs should only be committed deliberately.
+- Updated `README.md` and `CONTRIBUTING.md` so setup, Python-version, test, and evaluation guidance matches the current repo.
 
 ## Why
 

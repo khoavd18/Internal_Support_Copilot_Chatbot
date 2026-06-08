@@ -1,0 +1,7 @@
+account_id,customer_id,account_type,status,opened_at,balance_usd,online_banking_enabled
+bf_acct_001,bf_cust_001,checking,active,2025-01-12T09:10:00Z,4820.50,true
+bf_acct_002,bf_cust_002,checking,active,2025-02-03T11:25:00Z,1260.10,true
+bf_acct_003,bf_cust_003,business_checking,active,2025-03-18T14:30:00Z,22450.00,true
+bf_acct_004,bf_cust_004,checking,active,2025-04-09T08:50:00Z,3050.75,true
+bf_acct_005,bf_cust_005,brokerage_cash,restricted,2025-04-22T16:45:00Z,98500.00,true
+bf_acct_006,bf_cust_006,checking,active,2025-05-06T10:20:00Z,2150.25,true

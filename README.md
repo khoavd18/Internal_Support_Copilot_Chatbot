@@ -1,392 +1,524 @@
-# Internal Support Copilot
+# Enterprise Support Intelligence Copilot
 
-Enterprise-oriented internal support copilot that combines local RAG, agent routing, and a LangGraph-based multi-agent orchestration layer for GitHub Docs, GitLab Handbook, and GitHub Issues.
+A multi-source AI copilot for customer support, internal knowledge retrieval, ticket triage, CRM intelligence, GraphRAG, and risk/anomaly detection.
+Built as a reusable Enterprise AI Copilot base with FastAPI, Streamlit, Qdrant, Redis, LangGraph, domain adapters, synthetic enterprise support data, evaluation scripts, Docker, and tests.
 
-## Why This Project Is Worth Exploring
+## Problem
 
-- Multi-layer runtime design: plain RAG, single-agent orchestration, and LangGraph supervisor mode.
-- Practical internal-support use case instead of a toy chatbot wrapper.
-- Retrieval transparency with sources, debug metadata, and guardrail decisions.
-- Controlled write actions for GitHub repository creation and local git commits.
-- Test coverage for retrieval helpers, multi-agent synthesis, action wrappers, and API wiring.
+Support teams rarely have one clean source of truth. A single customer escalation can require CRM context, ticket history, knowledge-base policy, engineering issue status, service ownership, incident risk, and prior similar cases.
 
-## What This Project Does
+This project demonstrates how an enterprise support copilot can unify those signals into retrieval, automation, graph reasoning, and evaluation workflows while keeping data synthetic and local-demo friendly. The current implemented domain is `enterprise_support`; the core infrastructure is being organized so future domains can plug in through a domain adapter instead of rewriting ingestion, validation, evaluation, and API foundations.
 
-- Retrieves and synthesizes answers from internal knowledge sources.
-- Supports three backend modes: plain RAG, single-agent, and multi-agent supervisor flow.
-- Exposes a FastAPI service for application integration.
-- Provides a Streamlit UI for local exploration and debugging.
-- Includes guarded write actions for GitHub issue creation, GitHub repository creation, and local git commits.
+## Key Features
 
-## Architecture At A Glance
+- **FastAPI backend** with health/readiness checks, RAG chat, agent chat, enterprise support automation, grounded GraphRAG QA, and risk scoring endpoints.
+- **Streamlit UI** for local chat exploration and source/debug inspection.
+- **RAG with Qdrant** for document indexing and retrieval, including enterprise hybrid retrieval with dense, sparse/lexical, metadata-filtered fusion.
+- **Redis persistence** for sessions, pending actions, action records, and LangGraph checkpoints, with in-memory fallback settings for local tests.
+- **LangGraph multi-agent orchestration** for supervisor-style routing across support/retrieval/action workflows.
+- **Guarded write actions** for GitHub issue/repository actions and local git commits with authorization, confirmation, and idempotency controls.
+- **Synthetic enterprise support dataset** with CRM records, accounts, products, tickets, ticket messages, resolutions, knowledge-base policies, service catalog entries, GitHub issues, and risk events.
+- **Domain adapter layer** for reusable copilot domains. `enterprise_support` and `banking_fraud` wrap domain loading, validation, RAG document building, KG building, prompts, and evaluation queries.
+- **CRM and support automation endpoints** for customer summaries, ticket triage, suggested replies, SLA checks, and customer risk scoring.
+- **Knowledge Graph and GraphRAG layer** implemented in memory. `/enterprise/ask` fuses vector and graph context, scores evidence sufficiency, and returns a grounded deterministic answer, citations, missing-information notes, confidence, and the underlying evidence.
+- **Risk/anomaly scoring** implemented as a deterministic heuristic baseline over tickets and risk events, with an optional unsupervised IsolationForest baseline when `scikit-learn` is installed locally.
+- **Evaluation scripts** for retrieval, answer quality, and enterprise support evidence coverage.
+- **Docker support** for local Qdrant, Redis, API, and UI services.
 
-- `src/api`: FastAPI entrypoints and request/response orchestration.
-- `src/agent`: single-agent logic, routing, memory, and action wrappers.
-- `src/agent/graph`: supervisor graph and subgraphs for multi-agent retrieval.
-- `src/rag`: ingestion, chunking, indexing, retrieval, and answer generation.
-- `src/integrations`: GitHub App and local git integrations.
-- `src/ui`: Streamlit chat interface.
-- `scripts`: data preparation, retrieval evaluation, and environment checks.
-- `tests`: focused unit tests for retrieval, agent behavior, actions, and API wiring.
+## Architecture
 
-Detailed notes live in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
-Routing notes live in [docs/ROUTING.md](./docs/ROUTING.md).
-Action notes live in [docs/ACTIONS.md](./docs/ACTIONS.md).
-Deployment notes live in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
-Operator runbook lives in [docs/RUNBOOK.md](./docs/RUNBOOK.md).
-Troubleshooting notes live in [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
-Persistence notes live in [docs/PERSISTENCE.md](./docs/PERSISTENCE.md).
-Logging notes live in [docs/LOGGING.md](./docs/LOGGING.md).
-Observability notes live in [docs/OBSERVABILITY.md](./docs/OBSERVABILITY.md).
-Authorization notes live in [docs/AUTHORIZATION.md](./docs/AUTHORIZATION.md).
-Secret-handling notes live in [docs/SECURITY.md](./docs/SECURITY.md).
+```mermaid
+flowchart LR
+    UI[Streamlit UI] --> API[FastAPI API]
+    Client[API Client] --> API
 
-## Repository Layout
+    API --> PlainRAG[Plain RAG Pipeline]
+    API --> Agent[Single-Agent Router]
+    API --> Supervisor[LangGraph Supervisor]
+    API --> EnterpriseSvc[Enterprise Support Services]
+    API --> Risk[Risk Scoring]
+    API --> Registry[Domain Registry]
+
+    PlainRAG --> Retriever[Retriever / Reranker]
+    Agent --> Retriever
+    Supervisor --> Retriever
+    Retriever --> Qdrant[(Qdrant Vector Store)]
+
+    EnterpriseSvc --> Dataset[Synthetic Enterprise Dataset]
+    Risk --> Dataset
+    Registry --> Adapter[Domain Adapters]
+    Adapter --> Dataset
+    Dataset --> Docs[RAG Documents]
+    Dataset --> KG[In-Memory Knowledge Graph]
+    Docs --> Qdrant
+
+    API --> GraphRAG[GraphRAG Grounded QA]
+    GraphRAG --> Qdrant
+    GraphRAG --> KG
+
+    Agent --> Actions[Guarded Actions]
+    Supervisor --> Actions
+    Actions --> GitHub[GitHub / Local Git]
+
+    API --> Redis[(Redis Persistence)]
+    Supervisor --> Redis
+```
+
+## Data Model Summary
+
+The enterprise dataset lives under `data/sample_enterprise_support/` and is synthetic only.
+
+- `crm/`: customers, accounts, products
+- `support/`: tickets, ticket messages, ticket resolutions
+- `knowledge_base/`: SLA, access, refund, API timeout, login, security, incident, enterprise support, customer risk, and retention policies
+- `engineering/`: service catalog and synthetic GitHub issues
+- `risk/`: customer/ticket/service risk events
+
+Stable IDs connect the data: `customer_id`, `account_id`, `product_id`, `ticket_id`, `service_id`, `policy_id`, and `risk_event_id`.
+
+The banking fraud domain pack lives under `data/sample_banking_fraud/` and is also synthetic only. It includes customers, accounts, transactions, merchants, fraud alerts, AML cases, and policy documents for AML, card fraud, and account takeover workflows.
+
+Design docs:
+- [docs/data_model.md](./docs/data_model.md)
+- [docs/use_cases.md](./docs/use_cases.md)
+- [docs/kg_schema.md](./docs/kg_schema.md)
+
+## Folder Structure
 
 ```text
 .
 |-- src/
-|   |-- api/
-|   |-- agent/
-|   |-- integrations/
-|   |-- rag/
-|   |-- ui/
+|   |-- api/              # FastAPI app and endpoints
+|   |-- agent/            # Agent routing, tools, memory, guarded actions
+|   |-- agent/graph/      # LangGraph supervisor and subgraphs
+|   |-- core/             # Settings, auth, logging, observability, schemas
+|   |-- data/             # Enterprise support loaders, document builders, services
+|   |-- domains/          # Domain adapter interface, registry, and enterprise_support adapter
+|   |-- integrations/     # GitHub App and local git clients
+|   |-- kg/               # In-memory Knowledge Graph schema, builder, store, retriever
+|   |-- ml/               # Risk feature extraction, heuristic scoring, optional ML anomaly scoring
+|   |-- persistence/      # Redis and memory-backed persistence
+|   |-- rag/              # Chunking, ingestion, indexing, retrieval, GraphRAG, generation
+|   |-- ui/               # Streamlit UI
+|-- data/
+|   |-- sample_enterprise_support/
+|   |-- sample_banking_fraud/
+|-- data_source/          # Original local demo/evaluation source snapshot
+|-- docs/
+|-- eval/
 |-- scripts/
 |-- tests/
-|-- data_source/
-|-- eval/
-|-- .env.example
-|-- Dockerfile
 |-- docker-compose.yml
+|-- Dockerfile
 |-- pyproject.toml
-|-- pytest.ini
-|-- requirements.txt
 ```
 
-## Dependency Files
+## Domain Adapter Layer
 
-- `pyproject.toml`: package metadata plus mirrored runtime/dev dependency declarations.
-- `requirements.txt`: runtime install list.
-- `requirements-dev.txt`: runtime dependencies plus test/lint tooling.
-- No lock file is currently committed; the files above are kept in sync for local bootstrap.
+The reusable copilot boundary is `src/domains/`. A domain adapter exposes the domain-specific pieces needed by shared infrastructure:
 
-## Bootstrap
+- `name`
+- `default_data_dir`
+- `default_collection_name`
+- `load_dataset(data_dir)`
+- `validate_dataset(dataset)`
+- `build_documents(dataset)`
+- `build_graph(dataset)`
+- `get_eval_queries()`
+- `get_prompt_templates()`
 
-### Windows
+The current registered adapters are:
+
+- `enterprise_support`: CRM/customer support, tickets, KB policies, services, GitHub issues, and risk events.
+- `banking_fraud`: synthetic banking customers, accounts, transactions, merchants, fraud alerts, AML cases, and fraud/AML policies.
+
+Generic domain commands:
+
+```bash
+python scripts/validate_domain_data.py --domain enterprise_support
+python scripts/ingest_domain.py --domain enterprise_support --dry-run
+python eval/evaluate_domain.py --domain enterprise_support --dry-run
+
+python scripts/validate_domain_data.py --domain banking_fraud
+python scripts/ingest_domain.py --domain banking_fraud --dry-run
+python eval/evaluate_domain.py --domain banking_fraud --dry-run
+```
+
+To add a new domain, create `src/domains/<domain_name>/adapter.py`, implement the adapter interface, add domain-specific loader/document/KG/prompt modules as needed, and register the adapter in `src/domains/registry.py`. Keep IDs stable, return RAG documents with `id`, `text`, and `metadata`, and add dry-run validation/evaluation tests before wiring any domain-specific API behavior.
+
+### Banking Fraud Example
+
+The `banking_fraud` adapter demonstrates how the same copilot base can support a different enterprise domain without changing FastAPI or vector-store infrastructure. Example questions include:
+
+- "Explain fraud alert `bf_alert_001` for customer `bf_cust_001`."
+- "Summarize AML case `bf_case_001` and the linked suspicious wire alerts."
+- "What account takeover policy applies to a foreign device attempting a high-value wire?"
+
+## Setup
+
+Supported Python: `>=3.10,<3.12`.
+
+### Windows PowerShell
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 python scripts/dev.py install
 Copy-Item .env.example .env
 docker compose up -d qdrant redis
 ```
 
-Add your raw source material under `data_source/raw`, then ingest and run:
-
-```powershell
-python scripts/dev.py ingest-data
-python scripts/dev.py run-api
-python scripts/dev.py run-ui
-```
-
-Run tests any time with:
-
-```powershell
-python scripts/dev.py run-tests
-```
-
 ### Linux/macOS
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python scripts/dev.py install
 cp .env.example .env
 docker compose up -d qdrant redis
 ```
 
-Add your raw source material under `data_source/raw`, then ingest and run:
+Run the backend and UI:
 
 ```bash
-python scripts/dev.py ingest-data
 python scripts/dev.py run-api
 python scripts/dev.py run-ui
 ```
 
-Run tests any time with:
-
-```bash
-python scripts/dev.py run-tests
-```
-
-### Helper Commands
-
-- `python scripts/dev.py install`
-- `python scripts/dev.py benchmark-answers`
-- `python scripts/dev.py benchmark-retrieval`
-- `python scripts/dev.py ingest-data`
-- `python scripts/dev.py run-api`
-- `python scripts/dev.py run-ui`
-- `python scripts/dev.py run-tests`
-
-You can pass extra flags to the wrapped command after `--`.
-Example: `python scripts/dev.py run-api -- --host 0.0.0.0 --port 8000`
-
-## Local Deployment
-
-Two practical local modes are supported:
-
-- Host-run app + Docker infra: `docker compose up -d qdrant redis`, then run `python scripts/dev.py ingest-data`, `python scripts/dev.py run-api`, and `python scripts/dev.py run-ui`
-- Full Docker stack: `docker compose up -d qdrant redis`, then `docker compose run --rm --build api python scripts/ingest_data.py`, then `docker compose up --build`
-
-Container defaults:
+Default local URLs:
 
 - API: `http://127.0.0.1:8000`
 - UI: `http://127.0.0.1:8501`
 - Qdrant: `http://127.0.0.1:6333`
-- Redis: `127.0.0.1:6379`
+- Redis: `redis://localhost:6379/0`
 
-The API and UI images are built from the repo `Dockerfile`, and `docker-compose.yml` overrides container-only addresses such as `QDRANT_URL=http://qdrant:6333`, `REDIS_URL=redis://redis:6379/0`, and `INTERNAL_SUPPORT_API_BASE_URL=http://api:8000`.
+## Ingestion
 
-A concise stack diagram and the full startup notes live in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+### Original GitHub/Internal Knowledge Ingestion
 
-## Startup Assumptions
-
-- Python `3.10+` is required. The CI workflow currently exercises Python `3.10` and `3.11`.
-- The default `.env` assumes Qdrant is available at `http://localhost:6333`, which is what `docker compose up -d qdrant redis` starts.
-- The containerized API service overrides `QDRANT_URL` and `REDIS_URL` to use Docker service names, so you do not need a separate container-only env file.
-- The default `.env.example` also assumes Redis is available at `redis://localhost:6379/0` for persistent chat/session and checkpoint storage.
-- The containerized UI service overrides `INTERNAL_SUPPORT_API_BASE_URL` to `http://api:8000`.
-- Fresh clones do not include `data_source/processed`; you must place source content under `data_source/raw` and run `python scripts/dev.py ingest-data`.
-- `ingest-data` prepares JSONL files and rebuilds the Qdrant collection, so Qdrant must be running before you call it.
-- The API validates environment configuration at startup and will fail fast if enabled features are missing required settings.
-- The first real API/UI run may download Hugging Face models. On CPU-only machines, set `LLM_QUANTIZATION=none` in `.env` to avoid 4-bit/8-bit assumptions.
-- GitHub and local git write actions are disabled by default and require extra environment configuration before use.
-- Authorization is enabled by default. Anonymous requests are treated as `viewer`, while write-capable requests require `X-User-ID` and `X-User-Role: operator`.
-
-## Persistence
-
-- Chat history, pending confirmation actions, write-action records, and supervisor graph checkpoints now go through pluggable persistence abstractions.
-- Redis is the first persistent backend and is included in `docker-compose.yml`.
-- If Redis is unavailable and you want the previous local-only behavior, set `SESSION_STORE_BACKEND=memory`, `ACTION_STORE_BACKEND=memory`, and `GRAPH_CHECKPOINTER_BACKEND=memory`.
-- Setup and migration notes live in [docs/PERSISTENCE.md](./docs/PERSISTENCE.md).
-
-## Example API Usage
-
-### Ask the multi-agent backend
+The original ingestion path prepares documents from `data_source/` and rebuilds the configured Qdrant collection.
 
 ```bash
-curl -X POST http://127.0.0.1:8000/multi-agent/ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "How do I sign in with a passkey?",
-    "mode": "auto",
-    "debug": true
-  }'
+python scripts/dev.py ingest-data
 ```
 
-### Trigger a guarded action
+Equivalent direct command:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/multi-agent/actions/create-issue \
-  -H "Content-Type: application/json" \
-  -H "X-User-ID: operator-1" \
-  -H "X-User-Role: operator" \
-  -d '{
-    "repo_full_name": "your-org/demo-repo",
-    "title": "Bug login",
-    "body": "Steps to reproduce",
-    "confirmed": true,
-    "idempotency_key": "issue-bug-login-001"
-  }'
+python scripts/ingest_data.py
 ```
+
+Qdrant must be running before ingestion.
+
+### Enterprise Support Ingestion
+
+Generic domain dry-run:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/multi-agent/actions/create-repo \
-  -H "Content-Type: application/json" \
-  -H "X-User-ID: operator-1" \
-  -H "X-User-Role: operator" \
-  -d '{
-    "org": "your-org",
-    "name": "demo-repo",
-    "private": true,
-    "confirmed": true,
-    "idempotency_key": "repo-demo-repo-001"
-  }'
+python scripts/ingest_domain.py --domain enterprise_support --dry-run
 ```
 
-### Use Chat To Propose And Confirm Actions
+Preview the enterprise support documents without writing to Qdrant:
 
-`/agent/ask` and `/multi-agent/ask` can now detect write actions from natural-language requests.
+```bash
+python scripts/ingest_enterprise_support_data.py --dry-run
+```
 
-- Example request: `create issue repo:your-org/demo-repo title:"Bug login" body:"Steps to reproduce"`
-- The same request needs operator headers such as `X-User-ID: operator-1` and `X-User-Role: operator`.
-- First response: returns an action proposal when confirmation is required.
-- Confirm in the same chat session by sending `yes` / `xac nhan`, or resend the original request with `confirmed=true`.
-- Repeating the same write request in the same session now reuses the persisted action record instead of executing the side effect twice.
+Ingest into a separate Qdrant collection:
 
-## Core Endpoints
+```bash
+python scripts/ingest_enterprise_support_data.py --collection-name enterprise_support_copilot_qdrant
+```
 
-- `GET /health`
-- `GET /ready`
-- `POST /ask`
-- `POST /agent/ask`
-- `POST /multi-agent/ask`
-- `POST /multi-agent/actions/create-issue`
-- `POST /multi-agent/actions/create-repo`
-- `POST /multi-agent/actions/commit`
+Run the API against that collection:
 
-## Health Checks
+```bash
+QDRANT_COLLECTION_NAME=enterprise_support_copilot_qdrant python scripts/dev.py run-api
+```
 
-Use `/health` for a broad status snapshot that includes startup validation and dependency diagnostics:
+Windows PowerShell:
+
+```powershell
+$env:QDRANT_COLLECTION_NAME = "enterprise_support_copilot_qdrant"
+python scripts/dev.py run-api
+```
+
+## Hybrid Enterprise Retrieval
+
+Enterprise GraphRAG retrieval uses a conservative hybrid layer:
+
+- Dense semantic search against Qdrant when the enterprise collection is available.
+- Sparse Qdrant search when the collection has sparse vectors.
+- Local lexical fallback over `data/sample_enterprise_support/` when sparse Qdrant is unavailable or empty.
+- Reciprocal-rank fusion across dense and sparse/lexical candidates.
+- Optional metadata filters: `source_type`, `customer_id`, `ticket_id`, `service_id`, and `product_id`.
+- Debug metadata on retrieved documents: `dense_score`, `sparse_score`, `lexical_score`, `fused_score`, and matched metadata.
+
+Hybrid search helps with support queries that mix natural language with exact IDs or operational terms, for example `cust_001 SLA breach`, `tkt_001 API timeout`, or `svc_api_gateway owner`.
+
+If an older Qdrant collection was created without sparse vectors, `/enterprise/ask` still works through dense retrieval plus local lexical fallback. Rebuild or re-ingest the enterprise collection only if you want Qdrant-native sparse search:
+
+```bash
+python scripts/ingest_enterprise_support_data.py --collection-name enterprise_support_copilot_qdrant
+```
+
+Before final answer generation, `/enterprise/ask` also scores evidence sufficiency. The deterministic score considers evidence count, source diversity, exact entity matches, critical source coverage, contradiction signals, and freshness metadata. Low-sufficiency evidence produces a partial answer with explicit missing information instead of unsupported claims.
+
+### Controlled Agentic Retrieval
+
+`/enterprise/ask` can optionally use a bounded, deterministic agentic retrieval workflow:
+
+- Classifies intent as `customer_summary`, `ticket_triage`, `policy_lookup`, `service_owner`, `risk_explanation`, or `general`.
+- Chooses retrieval filters from the intent and any explicit request filters.
+- Runs the existing vector and Knowledge Graph retrieval path.
+- Scores evidence sufficiency.
+- If sufficiency is low, rewrites the query once with rule-based expansion and retrieves again.
+- Stops after at most two retrieval attempts.
+
+Enable it with:
+
+```json
+{
+  "question": "Why is tkt_001 risky?",
+  "use_agentic_retrieval": true,
+  "debug": true
+}
+```
+
+When enabled, the response includes `metadata.agentic_trace` with intent, attempts, filters used, sufficiency before/after, and stop reason. This workflow performs no autonomous write actions and does not call external systems beyond the existing read-only retrieval path.
+
+## Observability
+
+The API middleware propagates `X-Request-ID` into response headers, structured logs, and in-memory traces. Enterprise GraphRAG logs stage timings without logging the full user question:
+
+- dataset/context load
+- vector retrieval
+- graph retrieval
+- vector/graph fusion
+- evidence sufficiency scoring
+- grounded answer generation
+- total `/enterprise/ask` latency
+
+`/enterprise/ask` accepts `"debug": true` to include `metadata.debug` with `source_type_counts`, `evidence_count`, top evidence IDs, latency breakdown, hybrid retrieval debug, and evidence sufficiency details.
+
+The lightweight `/metrics` endpoint returns the in-memory observability snapshot, including counters/histograms such as `enterprise_ask_requests_total`, `enterprise_ask_errors_total`, `enterprise_ask_latency_ms`, and `enterprise_low_confidence_total`. No LangSmith or paid tracing service is required.
+
+## Risk Scoring
+
+`/risk/customer-score` defaults to a deterministic heuristic baseline. It extracts recent customer-level support and risk signals from the synthetic dataset, including ticket volume, critical tickets, escalations, failed-login/auth issues, API timeouts, refund/billing signals, and negative risk events.
+
+An optional unsupervised ML baseline is available through `mode: "ml"`. The ML path trains a small `IsolationForest` over the synthetic customer feature table if `scikit-learn` is installed in the local environment. `scikit-learn` is intentionally not a required dependency; when it is unavailable, ML mode falls back to the heuristic scorer and returns the fallback reason in `model_metadata`.
+
+The API currently trains this optional baseline in memory from the small synthetic cohort. The CLI artifact below is useful for local inspection and future extension; it is not required for the API endpoint.
+
+Preview the feature table without training:
+
+```bash
+python scripts/train_risk_model.py --dry-run
+```
+
+Train a local artifact if `scikit-learn` is installed:
+
+```bash
+python scripts/train_risk_model.py --output-path artifacts/risk/isolation_forest.pkl
+```
+
+Limitations: the current ML baseline is unsupervised, trained only on the small synthetic dataset, and should be treated as a portfolio/demo baseline rather than a production risk model. A real deployment would need labeled outcomes, drift checks, calibration, monitoring, and governance around customer-impacting decisions.
+
+## API Examples
+
+Health:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Use `/ready` for readiness probes. It returns `200` only when required dependencies are ready, and `503` with diagnostics when they are not:
+Readiness:
 
 ```bash
 curl -i http://127.0.0.1:8000/ready
 ```
 
-Typical readiness failures include:
-
-- Qdrant is not reachable at the configured `QDRANT_URL`.
-- The configured Qdrant collection does not exist yet because ingestion has not been run.
-- Redis-backed persistence is enabled but Redis is not reachable.
-- Optional GitHub or local git actions are enabled but their configuration is incomplete.
-
-## Structured Logging
-
-- Logs are structured and default to JSON lines with `LOG_FORMAT=json`.
-- Switch to a compact human-readable format with `LOG_FORMAT=text`.
-- Control verbosity with `LOG_LEVEL`, which defaults to `INFO` in `.env.example`.
-- Correlation fields are added when available: `request_id`, `session_id`, `user_id`, `action_id`, and `agent_name`.
-- The API accepts `X-Request-ID` and optional `X-User-ID` headers so upstream services can propagate correlation identifiers.
-- Server logs include stack traces for unexpected failures, while API responses keep error messages clean and non-sensitive.
-- Log messages, exception text, health diagnostics, and common URL credential formats are redacted before they are emitted.
-
-Example:
-
-```json
-{"timestamp":"2026-04-14T08:12:00Z","level":"INFO","logger":"src.api.main","event":"http.request.completed","request_id":"req-123","session_id":"chat-42","message":"HTTP request completed","status_code":200,"duration_ms":14.8}
-```
-
-Field definitions and redaction rules live in [docs/LOGGING.md](./docs/LOGGING.md).
-
-## Observability
-
-- Metrics and tracing hooks live in [src/core/observability.py](./src/core/observability.py).
-- The default backend is lightweight in-memory instrumentation with no external exporter dependency.
-- Measured latencies currently include request handling, retrieval, reranking, LLM calls, and write-action execution.
-- Write actions also emit success/failure counters by action type.
-- The design is backend-agnostic so Prometheus or OpenTelemetry adapters can be added later without touching the application call sites.
-
-Key environment variables:
-
-- `OBSERVABILITY_BACKEND=memory` or `noop`
-- `OBSERVABILITY_TRACE_HISTORY_LIMIT=200`
-
-Metric names and instrumentation points are documented in [docs/OBSERVABILITY.md](./docs/OBSERVABILITY.md).
-
-## Authorization
-
-- Read-only endpoints are available to `viewer` requests, including anonymous requests when `AUTH_ALLOW_ANONYMOUS_READS=true`.
-- Direct write endpoints and chat-driven write intents require `operator`.
-- The default lightweight provider reads `X-User-ID` and `X-User-Role`, but the permission boundary is isolated in [src/core/auth.py](./src/core/auth.py) so an SSO-backed provider can replace it later.
-- The current audit of read-only, mixed-mode, and write-capable routes lives in [docs/AUTHORIZATION.md](./docs/AUTHORIZATION.md).
-
-## Testing
-
-Run the focused test suite:
+Customer summary:
 
 ```bash
-python scripts/dev.py run-tests
+curl -X POST http://127.0.0.1:8000/crm/customer-summary \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_001"}'
 ```
 
-Run the retrieval benchmark:
+Ticket triage:
+
+```bash
+curl -X POST http://127.0.0.1:8000/support/ticket-triage \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id": "tkt_001"}'
+```
+
+Suggested support reply:
+
+```bash
+curl -X POST http://127.0.0.1:8000/support/suggest-reply \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id": "tkt_001"}'
+```
+
+Customer risk score:
+
+```bash
+curl -X POST http://127.0.0.1:8000/risk/customer-score \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_009", "mode": "heuristic"}'
+```
+
+Optional ML risk mode with heuristic fallback when `scikit-learn` is unavailable:
+
+```bash
+curl -X POST http://127.0.0.1:8000/risk/customer-score \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_009", "mode": "ml"}'
+```
+
+GraphRAG grounded QA:
+
+```bash
+curl -X POST http://127.0.0.1:8000/enterprise/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Why is the API timeout risky for Northstar?",
+    "debug": true,
+    "top_k": 5,
+    "graph_depth": 2,
+    "customer_id": "cust_001",
+    "source_type": "ticket",
+    "use_agentic_retrieval": true
+  }'
+```
+
+`/enterprise/ask` uses retrieved vector and graph evidence to build a deterministic grounded answer. It returns citations with `source_type`, `entity_id`, `title`, and snippets, plus `confidence`, `evidence_sufficiency`, and missing-information notes when evidence is insufficient. It does not call a paid or external LLM by default.
+
+## Evaluation
+
+Retrieval benchmark:
 
 ```bash
 python scripts/dev.py benchmark-retrieval
 ```
 
-Use `eval/queries/retrieval_benchmark.jsonl` for labeled cases, or pass a different benchmark file after `--`.
-The benchmark writes a per-query run file under `eval/runs/`, a machine-readable JSON summary under `eval/runs/`, and the latest human-readable report to `eval/reports/latest_retrieval_summary.txt`.
-Format details live in [eval/README.md](./eval/README.md).
-
-Run the answer-quality benchmark:
+Answer-quality benchmark:
 
 ```bash
 python scripts/dev.py benchmark-answers
 ```
 
-It reuses the same benchmark case file, generates answers through the local pipeline, and scores practical dimensions such as correctness, groundedness, citation relevance, and completeness.
-Outputs are written to timestamped files under `eval/runs/` and `eval/reports/`.
-
-Run lint locally:
+Enterprise support evaluation without Qdrant:
 
 ```bash
-ruff check .
+python eval/evaluate_domain.py --domain enterprise_support --dry-run
+python eval/evaluate_enterprise_support.py --dry-run
 ```
 
-Run a narrower regression set used during recent cleanup:
+Enterprise support dry-run uses local lexical retrieval plus the in-memory KG. It evaluates Recall@5 for expected entity IDs, source-type hit rate, metadata groundedness proxy, and missing-information handling proxy.
+
+Current dry-run snapshot:
+
+| Mode | Recall@5 | Source Type Hit Rate | Groundedness Proxy | Missing-Info Proxy |
+| --- | ---: | ---: | ---: | ---: |
+| Local lexical + KG dry-run | 0.6788 | 1.0000 | 1.0000 | 1.0000 |
+
+### AI Quality Gate
+
+Run the enterprise retrieval quality gate locally:
 
 ```bash
-python scripts/dev.py run-tests -- tests/test_agent_tools.py tests/test_multi_agent_synthesize.py tests/test_github_client.py tests/test_agent_actions.py tests/test_api_actions.py tests/test_chat_actions.py tests/test_api_chat_actions.py -q
+make eval-gate
 ```
 
-## CI
-
-- GitHub Actions runs three fast PR checks: `Lint`, `Import And Format`, and `Unit Tests`.
-- `Lint` and `Import And Format` use `ruff`, but only on changed Python files in the PR. This keeps normal review cycles fast while the repo still has some older style backlog outside the active diff.
-- `Unit Tests` runs `python -m pytest -m "not integration" -q` on Python `3.10` and `3.11`.
-- The default PR pipeline does not start live Qdrant, Redis, or GitHub integrations. Current checked-in tests stay isolated with fakes, monkeypatching, or `fakeredis`.
-- If you add tests that need live external services, mark them with `@pytest.mark.integration` so they stay clearly separated from the default unit-test workflow.
-
-Local equivalents:
+Equivalent direct command:
 
 ```bash
-python -m ruff check --select E,F,UP,B --ignore E501,B008 <changed-python-files>
-python -m ruff check --select I <changed-python-files>
-python -m ruff format --check <changed-python-files>
+python eval/evaluate_enterprise_support.py --dry-run --fail-under
+```
+
+Default thresholds:
+
+- Recall@5 must be at least `0.65`.
+- Source type hit rate must be at least `0.90`.
+
+The dry-run gate uses local lexical retrieval plus the in-memory Knowledge Graph, so it does not require Qdrant or paid APIs. Use custom thresholds when needed:
+
+```bash
+python eval/evaluate_enterprise_support.py --dry-run \
+  --min-recall-at-5 0.70 \
+  --min-source-hit-rate 0.95
+```
+
+Write machine-readable output:
+
+```bash
+python eval/evaluate_enterprise_support.py --dry-run --fail-under --json-output eval/runs/latest_enterprise_gate.json
+```
+
+Interpretation: gate failures mean the retrieved evidence no longer meets the minimum expected coverage for the synthetic enterprise benchmark. Inspect weak cases in the summary, then check whether the regression came from data changes, retrieval filters, lexical scoring, KG traversal, or expected labels.
+
+Qdrant GraphRAG evaluation requires enterprise ingestion first:
+
+```bash
+python scripts/ingest_enterprise_support_data.py --collection-name enterprise_support_copilot_qdrant
+QDRANT_COLLECTION_NAME=enterprise_support_copilot_qdrant python eval/evaluate_enterprise_support.py
+```
+
+## Testing
+
+Run the default test suite:
+
+```bash
+python scripts/dev.py run-tests
+```
+
+Run the CI-equivalent unit subset:
+
+```bash
 python -m pytest -m "not integration" -q
 ```
 
-## Operational Notes
+Run lint and format checks:
 
-- Keep secrets in `.env`; never commit real credentials.
-- Prefer storing the GitHub App PEM outside the repo and referencing it with `GITHUB_PRIVATE_KEY_PATH`.
-- If Redis or Qdrant use credentials, keep them only in local environment variables.
-- Generated data under `data_source/processed` is intentionally ignored.
-- GitHub write actions are protected by explicit feature flags and confirmation fields.
-- Local git commit actions are restricted by allowed root configuration.
-- Repeated write requests are guarded by persisted idempotency records with statuses such as `pending`, `running`, `succeeded`, and `failed`.
-- Logs and `/health` or `/ready` outputs now redact known secrets, but they should still be treated as internal operational data.
+```bash
+python -m ruff check .
+python -m ruff format --check .
+```
 
-## Repo Maturity Signals
+The GitHub Actions CI runs fast changed-file lint/format checks and unit tests on Python `3.10` and `3.11`.
 
-- MIT licensed for public personal-project sharing.
-- GitHub Actions CI added under `.github/workflows/ci.yml`.
-- Contributor guidance lives in `CONTRIBUTING.md`.
-- Tooling standards are captured in `pyproject.toml` and `.editorconfig`.
+## Production Notes
 
-## Engineering Standards
+Current limitations:
 
-- Prefer small, testable modules over broad service classes.
-- Keep agent orchestration and external side effects separated.
-- Document new entrypoints and env flags when extending the platform.
-- Add tests for routing, tools, and integration wrappers before shipping changes.
+- All enterprise customer/support data is synthetic.
+- `/enterprise/ask` uses deterministic grounded answer generation and evidence sufficiency scoring rather than a free-form LLM by default.
+- Risk scoring defaults to a deterministic heuristic baseline; the optional IsolationForest mode is an unsupervised demo baseline, not a calibrated production model.
+- The in-memory Knowledge Graph is suitable for demos and tests, not large-scale graph operations.
+- Local auth is header-based and intended as a replaceable boundary, not enterprise SSO.
+- Evaluation groundedness is metadata-based; it is not a full factuality judge.
 
-## Fresh Clone Checklist
+For real deployment:
 
-- Create and activate a Python `3.10+` virtual environment.
-- Run `python scripts/dev.py install`.
-- Copy `.env.example` to `.env`.
-- Start Qdrant with `docker compose up -d`.
-- Add source content under `data_source/raw`.
-- Run `python scripts/dev.py ingest-data`.
-- Start the API with `python scripts/dev.py run-api`.
-- Start the UI with `python scripts/dev.py run-ui`.
-- Verify the repo with `python scripts/dev.py run-tests`.
+- Replace synthetic data with governed CRM, support, incident, KB, and engineering connectors.
+- Add PII controls, tenant isolation, retention policies, audit logging, and human approval workflows.
+- Use production auth/SSO, RBAC, secrets management, and network controls.
+- Add background ingestion jobs, schema migrations, monitoring, tracing, and alerting.
+- Calibrate risk models with historical outcomes and evaluate them against labeled incidents/churn/escalation data before using them for operational decisions.
+- Replace the in-memory KG with a persistent graph store if graph volume or query complexity grows.
+- Optionally add configurable local or hosted LLM generation for GraphRAG while preserving citations, refusal behavior, and answer-quality evaluation.
+
+## Resume Bullets
+
+- Built an enterprise support AI copilot with FastAPI, Streamlit, Qdrant RAG, Redis persistence, LangGraph orchestration, guarded GitHub/local git actions, Docker, CI, and tests.
+- Designed a synthetic multi-source support dataset spanning CRM records, accounts, products, tickets, ticket messages, resolutions, policies, services, GitHub issues, and risk events.
+- Implemented CRM/support automation APIs for customer summaries, ticket triage, customer-safe reply drafting, SLA checks, and explainable customer risk scoring with heuristic and optional ML anomaly baselines.
+- Added an in-memory Knowledge Graph, grounded GraphRAG QA with citations/confidence, and enterprise evaluation suite measuring Recall@5, source-type coverage, groundedness proxy, and missing-information handling.
+
+## Safety
+
+This repository is designed for portfolio demonstration with synthetic data only. Do not commit private customer data, secrets, tokens, API keys, `.env`, GitHub private keys, or local credential files.

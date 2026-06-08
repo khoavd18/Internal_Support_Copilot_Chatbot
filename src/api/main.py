@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
 from src.agent.action_registry import (
     detect_action_request,
     execute_registered_action,
@@ -21,6 +20,10 @@ from src.agent.graph.supervisor import get_supervisor_graph
 from src.agent.memory import append_turn, get_pending_action
 from src.agent.service import get_agent
 from src.agent.session_utils import prepare_question_with_history
+from src.api.routes.crm import router as crm_router
+from src.api.routes.enterprise import router as enterprise_router
+from src.api.routes.risk import router as risk_router
+from src.api.routes.support import router as support_router
 from src.core.auth import (
     AuthorizationError,
     build_authorization_summary,
@@ -28,8 +31,11 @@ from src.core.auth import (
     resolve_request_auth_context,
 )
 from src.core.logging_utils import bind_log_context, configure_logging
-from src.core.observability import observe_duration
-from src.core.security import sanitize_error_text
+from src.core.observability import (
+    get_observability_snapshot,
+    observe_duration,
+)
+from src.core.runtime_checks import build_readiness_report, validate_environment_settings
 from src.core.schema import (
     AgentAskRequest,
     AgentResponse,
@@ -39,7 +45,7 @@ from src.core.schema import (
     CreateIssueRequest,
     CreateRepoRequest,
 )
-from src.core.runtime_checks import build_readiness_report, validate_environment_settings
+from src.core.security import sanitize_error_text
 from src.core.settings import API_CORS_ORIGINS
 from src.pipeline import build_pipeline, get_default_pipeline
 
@@ -155,7 +161,7 @@ async def request_logging_middleware(request: Request, call_next):
             return response
 
 
-def _run_startup_validation() -> Dict[str, Any]:
+def _run_startup_validation() -> dict[str, Any]:
     validation = validate_environment_settings()
 
     if validation["warnings"]:
@@ -177,13 +183,13 @@ def _run_startup_validation() -> Dict[str, Any]:
     return validation
 
 
-def _build_health_payload(app_instance: FastAPI) -> Dict[str, Any]:
+def _build_health_payload(app_instance: FastAPI) -> dict[str, Any]:
     from src.core.settings import GITHUB_ACTIONS_ENABLED, LOCAL_GIT_ACTIONS_ENABLED
 
     pipeline_cached = get_default_pipeline.cache_info().currsize > 0
     readiness = build_readiness_report()
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "status": "ok",
         "service": "internal-support-copilot-api",
         "startup_validation": getattr(
@@ -288,10 +294,10 @@ def _execute_registered_action_request(
     *,
     request: Request,
     action_name: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     confirmed: bool,
     idempotency_key: str | None,
-    log_fields: Dict[str, Any],
+    log_fields: dict[str, Any],
     failure_detail: str,
 ) -> AgentResponse:
     permission_name = get_action_permission_name(action_name)
@@ -327,7 +333,7 @@ def _execute_registered_action_request(
                 },
             )
             raise HTTPException(status_code=400, detail=safe_detail) from exc
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Write action endpoint failed",
                 extra={
@@ -335,11 +341,11 @@ def _execute_registered_action_request(
                     "action_name": action_name,
                 },
             )
-            raise HTTPException(status_code=500, detail=failure_detail)
+            raise HTTPException(status_code=500, detail=failure_detail) from exc
 
 
 @app.get("/health", tags=["system"])
-def health_check(request: Request) -> Dict[str, Any]:
+def health_check(request: Request) -> dict[str, Any]:
     logger.info(
         "Health endpoint requested",
         extra={"event": "health.requested"},
@@ -360,6 +366,17 @@ def readiness_check() -> JSONResponse:
         },
     )
     return JSONResponse(status_code=status_code, content=payload)
+
+
+@app.get("/metrics", tags=["system"])
+def metrics_snapshot() -> dict[str, Any]:
+    return get_observability_snapshot()
+
+
+app.include_router(crm_router)
+app.include_router(support_router)
+app.include_router(risk_router)
+app.include_router(enterprise_router)
 
 
 @app.post("/ask", response_model=AskResponse, tags=["chat"])
@@ -394,12 +411,12 @@ def ask_question(payload: AskRequest, request: Request) -> AskResponse:
             )
         except HTTPException:
             raise
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Plain ask request failed",
                 extra={"event": "chat.ask.failed"},
             )
-            raise HTTPException(status_code=500, detail="Failed to process question.")
+            raise HTTPException(status_code=500, detail="Failed to process question.") from exc
 
 
 @app.post("/agent/ask", response_model=AgentResponse, tags=["chat"])
@@ -447,12 +464,12 @@ def ask_agent(payload: AgentAskRequest, request: Request) -> AgentResponse:
             return AgentResponse(**result)
         except HTTPException:
             raise
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Single-agent request failed",
                 extra={"event": "agent.ask.failed"},
             )
-            raise HTTPException(status_code=500, detail="Failed to process agent request.")
+            raise HTTPException(status_code=500, detail="Failed to process agent request.") from exc
 
 
 @app.post("/multi-agent/ask", response_model=AgentResponse, tags=["chat"])
@@ -517,7 +534,9 @@ def ask_multi_agent(payload: AgentAskRequest, request: Request) -> AgentResponse
                 "reason": "No agent metadata returned.",
                 "tool_calls": [],
             }
-            normalized_debug = _normalize_debug_payload(result.get("debug", [])) if payload.debug else []
+            normalized_debug = (
+                _normalize_debug_payload(result.get("debug", [])) if payload.debug else []
+            )
 
             stats = dict(result.get("stats", {}))
             stats["debug_requested"] = payload.debug
@@ -535,12 +554,12 @@ def ask_multi_agent(payload: AgentAskRequest, request: Request) -> AgentResponse
             )
         except HTTPException:
             raise
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Multi-agent request failed",
                 extra={"event": "multi_agent.ask.failed"},
             )
-            raise HTTPException(status_code=500, detail="Multi-agent request failed.")
+            raise HTTPException(status_code=500, detail="Multi-agent request failed.") from exc
 
 
 @app.post("/multi-agent/actions/create-repo", response_model=AgentResponse, tags=["actions"])

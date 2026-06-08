@@ -1,0 +1,9 @@
+service_id,service_name,description,product_id,owner_team,support_escalation_team,tier,slack_channel,runbook_policy_id,on_call_rotation,repo,status
+svc_api_gateway,API Gateway,Routes public API traffic and enforces rate limits,prod_api,eng_api_platform,api_support,tier_0,#team-api-gateway,pol_api_timeout,api-primary,example/support-platform-api,active
+svc_auth,Auth Service,Handles SSO SCIM and session validation,prod_identity,eng_identity,identity_support,tier_0,#team-auth,pol_login_troubleshooting,identity-primary,example/support-identity,active
+svc_mfa,MFA Service,Handles MFA enrollment reset and device verification,prod_identity,eng_identity,identity_support,tier_1,#team-mfa,pol_security_escalation,identity-secondary,example/support-mfa,active
+svc_billing,Billing Ledger,Handles invoices credits taxes and refunds,prod_billing,eng_revenue,billing_support,tier_1,#team-billing,pol_refund,revenue-primary,example/support-billing,active
+svc_data_export,Data Export Service,Generates scheduled and on demand customer exports,prod_data_export,eng_data_platform,data_support,tier_1,#team-data-export,pol_data_retention,data-primary,example/support-data-export,active
+svc_integration_sync,Integration Sync Service,Syncs CRM ERP Slack and partner integration records,prod_integrations,eng_integrations,integration_support,tier_0,#team-integrations,pol_incident_response,integrations-primary,example/support-integrations,active
+svc_web_portal,Web Portal,Serves admin workspace billing and support UI,prod_identity,eng_web_platform,identity_support,tier_2,#team-web-portal,pol_access,web-primary,example/support-web-portal,active
+svc_notification,Notification Service,Delivers webhooks emails and customer notifications,prod_api,eng_api_platform,api_support,tier_1,#team-notifications,pol_incident_response,api-secondary,example/support-notifications,active
