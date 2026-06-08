@@ -1,0 +1,16 @@
+transaction_id,account_id,customer_id,merchant_id,amount_usd,currency,transaction_type,channel,country,created_at,status,device_id,ip_country
+bf_txn_001,bf_acct_001,bf_cust_001,bf_merch_001,64.12,USD,purchase,card_present,US,2026-05-12T09:14:00Z,approved,dev_jordan_phone,US
+bf_txn_002,bf_acct_001,bf_cust_001,bf_merch_002,1199.00,USD,purchase,ecommerce,US,2026-05-14T22:42:00Z,approved,dev_unknown_884,RO
+bf_txn_003,bf_acct_001,bf_cust_001,bf_merch_006,449.99,USD,purchase,ecommerce,SG,2026-05-14T22:48:00Z,declined,dev_unknown_884,RO
+bf_txn_004,bf_acct_002,bf_cust_002,bf_merch_003,2500.00,USD,crypto_purchase,mobile,EE,2026-05-15T01:05:00Z,approved,dev_maya_phone,US
+bf_txn_005,bf_acct_002,bf_cust_002,bf_merch_008,7200.00,USD,wire_transfer,online,PA,2026-05-15T01:32:00Z,held,dev_unknown_992,RU
+bf_txn_006,bf_acct_003,bf_cust_003,bf_merch_004,1840.00,USD,purchase,ecommerce,BR,2026-05-16T12:10:00Z,approved,dev_noah_laptop,GB
+bf_txn_007,bf_acct_003,bf_cust_003,bf_merch_008,9100.00,USD,wire_transfer,online,PA,2026-05-16T12:22:00Z,held,dev_noah_laptop,GB
+bf_txn_008,bf_acct_004,bf_cust_004,bf_merch_007,52.40,USD,purchase,card_present,US,2026-05-17T18:35:00Z,approved,dev_aisha_card,US
+bf_txn_009,bf_acct_004,bf_cust_004,bf_merch_005,300.00,USD,atm_withdrawal,atm,US,2026-05-18T07:45:00Z,approved,dev_aisha_card,US
+bf_txn_010,bf_acct_005,bf_cust_005,bf_merch_008,15000.00,USD,wire_transfer,online,PA,2026-05-18T23:55:00Z,held,dev_unknown_771,NG
+bf_txn_011,bf_acct_005,bf_cust_005,bf_merch_003,9800.00,USD,crypto_purchase,online,EE,2026-05-19T00:10:00Z,declined,dev_unknown_771,NG
+bf_txn_012,bf_acct_006,bf_cust_006,bf_merch_006,89.99,USD,purchase,ecommerce,SG,2026-05-19T03:20:00Z,approved,dev_sofia_phone,BR
+bf_txn_013,bf_acct_006,bf_cust_006,bf_merch_006,92.99,USD,purchase,ecommerce,SG,2026-05-19T03:25:00Z,approved,dev_sofia_phone,BR
+bf_txn_014,bf_acct_006,bf_cust_006,bf_merch_006,94.99,USD,purchase,ecommerce,SG,2026-05-19T03:31:00Z,declined,dev_sofia_phone,BR
+bf_txn_015,bf_acct_002,bf_cust_002,bf_merch_005,1000.00,USD,atm_withdrawal,atm,US,2026-05-15T02:05:00Z,approved,dev_unknown_992,RU

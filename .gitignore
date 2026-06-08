@@ -18,13 +18,19 @@ __pycache__/
 coverage.xml
 htmlcov/
 
-# Virtual environments and local environment files
+# Virtual environments, local environment files, and secrets
 .env
 .env.*
 !.env.example
 .envrc
 .direnv/
 .python-version
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+secrets/
 env/
 .venv/
 venv/
@@ -75,8 +81,12 @@ hf_cache/
 .cache/
 artifacts/
 outputs/
+models/risk/
 qdrant_storage/
 .qdrant/
+redis_data/
+dump.rdb
+appendonlydir/
 Internal_Support_Copilot.zip
 
 # Streamlit

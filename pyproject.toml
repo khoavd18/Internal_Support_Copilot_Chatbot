@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "internal-support-copilot"
 version = "1.2.0"
 description = "Enterprise-oriented internal support copilot built with local RAG and multi-agent orchestration."
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.12"
 dependencies = [
   "accelerate>=0.33,<1",
   "beautifulsoup4>=4.12,<5",

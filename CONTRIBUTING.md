@@ -4,10 +4,12 @@ Thanks for your interest in improving Internal Support Copilot.
 
 ## Local Setup
 
+Use Python `3.10` or `3.11`; the project metadata intentionally excludes Python `3.12+` until the ML dependency stack is validated there.
+
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
+python scripts/dev.py install
 Copy-Item .env.example .env
 ```
 
@@ -23,8 +25,9 @@ Copy-Item .env.example .env
 Run these before opening a pull request:
 
 ```powershell
-ruff check .
-pytest -q
+python -m ruff check .
+python -m ruff format --check .
+python scripts/dev.py run-tests
 ```
 
 ## Pull Request Notes

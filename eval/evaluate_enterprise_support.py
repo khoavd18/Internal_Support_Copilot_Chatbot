@@ -24,6 +24,8 @@ DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "sample_enterprise_support"
 RUNS_DIR = PROJECT_ROOT / "eval" / "runs"
 REPORTS_DIR = PROJECT_ROOT / "eval" / "reports"
 RECALL_K = 5
+DEFAULT_MIN_RECALL_AT_5 = 0.65
+DEFAULT_MIN_SOURCE_HIT_RATE = 0.90
 
 NODE_TYPE_TO_SOURCE_TYPE = {
     "Account": "account",
@@ -683,7 +685,103 @@ def _format_metric(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.4f}"
 
 
-def parse_args() -> argparse.Namespace:
+def evaluate_quality_gate(
+    summary: dict[str, Any],
+    *,
+    min_recall_at_5: float | None = None,
+    min_source_hit_rate: float | None = None,
+) -> dict[str, Any]:
+    metrics = summary.get("metrics") or {}
+    checks = []
+    passed = True
+
+    if min_recall_at_5 is not None:
+        metric_value = metrics.get("recall_at_5")
+        check_passed = metric_value is not None and float(metric_value) >= min_recall_at_5
+        checks.append(
+            {
+                "metric": "recall_at_5",
+                "actual": metric_value,
+                "minimum": min_recall_at_5,
+                "passed": check_passed,
+            }
+        )
+        passed = passed and check_passed
+
+    if min_source_hit_rate is not None:
+        metric_value = metrics.get("source_type_hit_rate")
+        check_passed = metric_value is not None and float(metric_value) >= min_source_hit_rate
+        checks.append(
+            {
+                "metric": "source_type_hit_rate",
+                "actual": metric_value,
+                "minimum": min_source_hit_rate,
+                "passed": check_passed,
+            }
+        )
+        passed = passed and check_passed
+
+    return {
+        "enabled": bool(checks),
+        "passed": passed,
+        "checks": checks,
+    }
+
+
+def _resolve_gate_thresholds(args: argparse.Namespace) -> tuple[float | None, float | None]:
+    gate_enabled = bool(
+        args.fail_under or args.min_recall_at_5 is not None or args.min_source_hit_rate is not None
+    )
+    if not gate_enabled:
+        return None, None
+
+    min_recall_at_5 = (
+        args.min_recall_at_5 if args.min_recall_at_5 is not None else DEFAULT_MIN_RECALL_AT_5
+    )
+    min_source_hit_rate = (
+        args.min_source_hit_rate
+        if args.min_source_hit_rate is not None
+        else DEFAULT_MIN_SOURCE_HIT_RATE
+    )
+    return min_recall_at_5, min_source_hit_rate
+
+
+def _print_summary(
+    summary: dict[str, Any], paths: dict[str, str], quality_gate: dict[str, Any]
+) -> None:
+    metrics = summary["metrics"]
+    print("Enterprise Support Evaluation")
+    print(f"Mode                 : {summary['mode']}")
+    print(f"Queries              : {summary['query_count']}")
+    print(f"Recall@5             : {_format_metric(metrics['recall_at_5'])}")
+    print(f"Source type hit rate : {_format_metric(metrics['source_type_hit_rate'])}")
+    print(f"Source type all-hit  : {_format_metric(metrics['source_type_all_hit_rate'])}")
+    print(f"Groundedness proxy   : {_format_metric(metrics['groundedness_rate'])}")
+    print(f"Missing-info proxy   : {_format_metric(metrics['missing_info_handling_rate'])}")
+    print(f"Vector errors        : {summary['vector_error_count']}")
+    if quality_gate["enabled"]:
+        print(f"Quality gate         : {'PASS' if quality_gate['passed'] else 'FAIL'}")
+        for check in quality_gate["checks"]:
+            actual = _format_metric(check["actual"])
+            minimum = _format_metric(check["minimum"])
+            status = "PASS" if check["passed"] else "FAIL"
+            print(f"  - {check['metric']}: actual={actual}, min={minimum}, {status}")
+    if paths:
+        print(f"Run output           : {paths['run_jsonl']}")
+        print(f"Summary output       : {paths['summary_json']}")
+
+
+def _write_json_output(path_value: str, payload: dict[str, Any]) -> None:
+    text = json.dumps(payload, indent=2, ensure_ascii=False)
+    if path_value == "-":
+        print(text)
+        return
+    path = Path(path_value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text + "\n", encoding="utf-8")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Evaluate enterprise support retrieval and GraphRAG evidence coverage."
     )
@@ -722,11 +820,40 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Evaluate only the first N cases.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--min-recall-at-5",
+        type=float,
+        default=None,
+        help=(
+            "Minimum Recall@5 required for the quality gate. If omitted with "
+            "--fail-under, defaults to 0.65."
+        ),
+    )
+    parser.add_argument(
+        "--min-source-hit-rate",
+        type=float,
+        default=None,
+        help=(
+            "Minimum source type hit rate required for the quality gate. If omitted "
+            "with --fail-under, defaults to 0.90."
+        ),
+    )
+    parser.add_argument(
+        "--fail-under",
+        action="store_true",
+        help="Enable the default enterprise retrieval quality gate.",
+    )
+    parser.add_argument(
+        "--json-output",
+        nargs="?",
+        const="-",
+        default=None,
+        help="Write machine-readable evaluation output to a path, or stdout if no path is supplied.",
+    )
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def run_cli(args: argparse.Namespace) -> int:
     result = run_evaluation(
         queries_path=args.queries_path,
         data_dir=args.data_dir,
@@ -736,20 +863,29 @@ def main() -> None:
         limit=args.limit,
     )
     summary = result["summary"]
-    metrics = summary["metrics"]
-    print("Enterprise Support Evaluation")
-    print(f"Mode                 : {summary['mode']}")
-    print(f"Queries              : {summary['query_count']}")
-    print(f"Recall@5             : {_format_metric(metrics['recall_at_5'])}")
-    print(f"Source type hit rate : {_format_metric(metrics['source_type_hit_rate'])}")
-    print(f"Source type all-hit  : {_format_metric(metrics['source_type_all_hit_rate'])}")
-    print(f"Groundedness proxy   : {_format_metric(metrics['groundedness_rate'])}")
-    print(f"Missing-info proxy   : {_format_metric(metrics['missing_info_handling_rate'])}")
-    print(f"Vector errors        : {summary['vector_error_count']}")
-    if result["paths"]:
-        print(f"Run output           : {result['paths']['run_jsonl']}")
-        print(f"Summary output       : {result['paths']['summary_json']}")
+    min_recall_at_5, min_source_hit_rate = _resolve_gate_thresholds(args)
+    quality_gate = evaluate_quality_gate(
+        summary,
+        min_recall_at_5=min_recall_at_5,
+        min_source_hit_rate=min_source_hit_rate,
+    )
+    payload = {
+        "summary": summary,
+        "quality_gate": quality_gate,
+        "paths": result["paths"],
+    }
+
+    if args.json_output:
+        _write_json_output(str(args.json_output), payload)
+    if args.json_output != "-":
+        _print_summary(summary, result["paths"], quality_gate)
+
+    return 0 if quality_gate["passed"] else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    return run_cli(parse_args(argv))
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

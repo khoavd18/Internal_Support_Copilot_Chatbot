@@ -1,0 +1,9 @@
+merchant_id,merchant_name,category,country,risk_level
+bf_merch_001,Metro Grocery,grocery,US,low
+bf_merch_002,Northstar Electronics,electronics,US,medium
+bf_merch_003,Global Crypto Exchange,crypto_exchange,EE,high
+bf_merch_004,Sunset Travel,travel,BR,medium
+bf_merch_005,FastCash ATM,atm,US,medium
+bf_merch_006,Digital Game Hub,digital_goods,SG,high
+bf_merch_007,Harbor Fuel,fuel,US,low
+bf_merch_008,Offshore Wire Services,money_services,PA,high

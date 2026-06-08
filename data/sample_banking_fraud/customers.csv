@@ -1,0 +1,7 @@
+customer_id,full_name,email,segment,region,risk_tier,kyc_status,created_at
+bf_cust_001,Jordan Ellis,jordan.ellis@synthetic-bank.example.com,retail,NA,medium,verified,2025-01-12T09:00:00Z
+bf_cust_002,Maya Ortiz,maya.ortiz@synthetic-bank.example.com,retail,NA,high,enhanced_review,2025-02-03T11:15:00Z
+bf_cust_003,Noah Kim,noah.kim@synthetic-bank.example.com,small_business,EMEA,medium,verified,2025-03-18T14:20:00Z
+bf_cust_004,Aisha Rahman,aisha.rahman@synthetic-bank.example.com,retail,APAC,low,verified,2025-04-09T08:40:00Z
+bf_cust_005,Luca Bianchi,luca.bianchi@synthetic-bank.example.com,wealth,EMEA,high,enhanced_review,2025-04-22T16:30:00Z
+bf_cust_006,Sofia Mendes,sofia.mendes@synthetic-bank.example.com,retail,LATAM,medium,verified,2025-05-06T10:10:00Z
